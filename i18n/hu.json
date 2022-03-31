@@ -1,16 +1,16 @@
 {
 	"@metadata": {
 		"authors": [
+			"Csega",
 			"Dani",
 			"Dj",
 			"Dorgan",
 			"Glanthor Reviol",
-			"TK-999",
-			"Tgr",
-			"Csega",
 			"Máté",
-			"Wolf Rex",
-			"Tacsipacsi"
+			"TK-999",
+			"Tacsipacsi",
+			"Tgr",
+			"Wolf Rex"
 		]
 	},
 	"pageforms-desc": "Űrlapok szemantikus adatok hozzáadásához és szerkesztéséhez",
@@ -36,9 +36,9 @@
 	"pf_createtemplate_aggregationlabel": "Lista címe:",
 	"pf_createtemplate_outputformat": "Kimeneti formátum:",
 	"pf_createtemplate_standardformat": "Táblázat",
-	"pf_createtemplate_infoboxformat": "Jobboldai infobox",
+	"pf_createtemplate_infoboxformat": "Oldalsó infobox",
 	"pf_createtemplate_addfield": "Mező hozzáadása",
-	"pf_createtemplate_deletefield": "Törlés",
+	"pf_createtemplate_deletefield": "Mező törlése",
 	"forms": "Űrlapok",
 	"pf_forms_docu": "A következő űrlapok találhatóak meg a wikiben.",
 	"pf_forminputs_mandatory": "Kötelező",
@@ -114,6 +114,7 @@
 	"pf_bad_url_error": "a helyes URL formátumban kell lennie, az elején „http://”-vel",
 	"pf_bad_email_error": "helyes e-mail-cím-formátumban kell lennie",
 	"pf_bad_number_error": "számnak kell lennie",
+	"pf_bad_integer_error": "egész számnak kell lennie",
 	"pf_bad_date_error": "érvényes dátumnak kell lennie",
 	"uploadwindow": "Feltöltési ablak",
 	"pf_deletionlog": "Törlési napló",
@@ -129,8 +130,8 @@
 	"pf_blank_namespace": "Fő",
 	"right-viewedittab": "a „{{int:edit}}” fül megjelenítése űrlappal szerkeszthető lapokon",
 	"right-editrestrictedfields": "korlátozott űrlap-mezők szerkesztése",
-	"pf-select2-no-matches": "Nincs találat",
-	"pf-select2-searching": "Keresés...",
+	"pf-autocomplete-no-matches": "Nincs találat",
+	"pf-autocomplete-searching": "Keresés...",
 	"pf-datepicker-close": "Bezárás",
 	"pf-datepicker-prev": "Előző",
 	"pf-datepicker-next": "Következő",

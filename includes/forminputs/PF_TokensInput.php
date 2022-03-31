@@ -4,20 +4,23 @@
  * @ingroup PF
  */
 
+use MediaWiki\MediaWikiServices;
+
 /**
  * @ingroup PFFormInput
  */
 class PFTokensInput extends PFFormInput {
-	public static function getName() {
+
+	public static function getName(): string {
 		return 'tokens';
 	}
 
 	public static function getDefaultPropTypes() {
-		return array();
+		return [];
 	}
 
 	public static function getOtherPropTypesHandled() {
-		$otherPropTypesHandled = array( '_wpg' );
+		$otherPropTypesHandled = [ '_wpg' ];
 		if ( defined( 'SMWDataItem::TYPE_STRING' ) ) {
 			// SMW < 1.9
 			$otherPropTypesHandled[] = '_str';
@@ -28,36 +31,36 @@ class PFTokensInput extends PFFormInput {
 	}
 
 	public static function getDefaultPropTypeLists() {
-		return array(
-			'_wpg' => array( 'is_list' => true, 'size' => 100 )
-		);
+		return [
+			'_wpg' => [ 'is_list' => true, 'size' => 100 ]
+		];
 	}
 
 	public static function getOtherPropTypeListsHandled() {
 		if ( defined( 'SMWDataItem::TYPE_STRING' ) ) {
 			// SMW < 1.9
-			return array( '_str' );
+			return [ '_str' ];
 		} else {
-			return array( '_txt' );
+			return [ '_txt' ];
 		}
 	}
 
 	public static function getDefaultCargoTypes() {
-		return array();
+		return [];
 	}
 
 	public static function getOtherCargoTypesHandled() {
-		return array( 'Page', 'String' );
+		return [ 'Page', 'String' ];
 	}
 
 	public static function getDefaultCargoTypeLists() {
-		return array(
-			'Page' => array( 'is_list' => true, 'size' => 100 )
-		);
+		return [
+			'Page' => [ 'is_list' => true, 'size' => 100 ]
+		];
 	}
 
 	public static function getOtherCargoTypeListsHandled() {
-		return array( 'String' );
+		return [ 'String' ];
 	}
 
 	public static function getHTML( $cur_value, $input_name, $is_mandatory, $is_disabled, array $other_args ) {
@@ -73,18 +76,24 @@ class PFTokensInput extends PFFormInput {
 			} else {
 				$name = $input_name;
 			}
-			$wgPageFormsEDSettings[$name] = array();
+			$wgPageFormsEDSettings[$name] = [];
 			if ( $other_args['values from external data'] != null ) {
 				$wgPageFormsEDSettings[$name]['title'] = $other_args['values from external data'];
 			}
 			if ( array_key_exists( 'image', $other_args ) ) {
+				if ( method_exists( MediaWikiServices::class, 'getRepoGroup' ) ) {
+					// MediaWiki 1.34+
+					$repoGroup = MediaWikiServices::getInstance()->getRepoGroup();
+				} else {
+					$repoGroup = RepoGroup::singleton();
+				}
 				$image_param = $other_args['image'];
 				$wgPageFormsEDSettings[$name]['image'] = $image_param;
 				global $edgValues;
 				for ( $i = 0; $i < count( $edgValues[$image_param] ); $i++ ) {
 					$image = $edgValues[$image_param][$i];
 					if ( strpos( $image, "http" ) !== 0 ) {
-						$file = wfFindFile( $image );
+						$file = $repoGroup->findFile( $image );
 						if ( $file ) {
 							$url = $file->getFullUrl();
 							$edgValues[$image_param][$i] = $url;
@@ -96,6 +105,11 @@ class PFTokensInput extends PFFormInput {
 			}
 			if ( array_key_exists( 'description', $other_args ) ) {
 				$wgPageFormsEDSettings[$name]['description'] = $other_args['description'];
+			}
+			if ( array_key_exists( 'delimiter', $other_args ) ) {
+				$delimiter = $other_args['delimiter'];
+			} else {
+				$delimiter = ',';
 			}
 		} else {
 			list( $autocompleteSettings, $remoteDataType, $delimiter ) = PFValuesUtils::setAutocompleteValues( $other_args, true );
@@ -118,20 +132,25 @@ class PFTokensInput extends PFFormInput {
 			$size = '100';
 		}
 
-		$inputAttrs = array(
+		$inputAttrs = [
 			'id' => $input_id,
-			'size' => $size,
+			'name' => $input_name . '[]',
 			'class' => $className,
+			'style' => 'width:' . $size * 6 . 'px',
+			'multiple' => 'multiple',
+			'value' => $cur_value,
+			'size' => 1,
+			'data-size' => $size * 6 . 'px',
 			'tabindex' => $wgPageFormsTabIndex,
 			'autocompletesettings' => $autocompleteSettings,
-		);
+		];
 		if ( array_key_exists( 'origName', $other_args ) ) {
 			$inputAttrs['origName'] = $other_args['origName'];
 		}
 		if ( array_key_exists( 'existing values only', $other_args ) ) {
 			$inputAttrs['existingvaluesonly'] = 'true';
 		}
-		if ( !is_null( $remoteDataType ) ) {
+		if ( $remoteDataType !== null ) {
 			$inputAttrs['autocompletedatatype'] = $remoteDataType;
 		}
 		if ( $is_disabled ) {
@@ -146,11 +165,52 @@ class PFTokensInput extends PFFormInput {
 		if ( array_key_exists( 'max values', $other_args ) ) {
 			$inputAttrs['maxvalues'] = $other_args['max values'];
 		}
-		if ( array_key_exists( 'namespace', $other_args ) ) {
-			$inputAttrs['data-namespace'] = $other_args['namespace'];
+
+		// This code adds predefined tokens in the form of <options>
+
+		$cur_values = PFValuesUtils::getValuesArray( $cur_value, $delimiter );
+		$optionsText = '';
+
+		if ( ( $possible_values = $other_args['possible_values'] ) == null ) {
+			// If it's a Boolean property, display 'Yes' and 'No'
+			// as the values.
+			if ( array_key_exists( 'property_type', $other_args ) && $other_args['property_type'] == '_boo' ) {
+				$possible_values = [
+					PFUtils::getWordForYesOrNo( true ),
+					PFUtils::getWordForYesOrNo( false ),
+				];
+			} else {
+				$possible_values = [];
+			}
 		}
 
-		$text = "\n\t" . Html::input( $input_name, $cur_value, 'text', $inputAttrs ) . "\n";
+		foreach ( $possible_values as $possible_value ) {
+			if (
+				array_key_exists( 'value_labels', $other_args ) &&
+				is_array( $other_args['value_labels'] ) &&
+				array_key_exists( $possible_value, $other_args['value_labels'] )
+			) {
+				$optionLabel = $other_args['value_labels'][$possible_value];
+			} else {
+				$optionLabel = $possible_value;
+			}
+			$optionAttrs = [ 'value' => $possible_value ];
+			if ( in_array( $possible_value, $cur_values ) ) {
+				$optionAttrs['selected'] = 'selected';
+			}
+			$optionsText .= Html::element( 'option', $optionAttrs, $optionLabel );
+		}
+		foreach ( $cur_values as $current_value ) {
+			if ( !in_array( $current_value, $possible_values ) && $current_value !== '' ) {
+				$optionAttrs = [ 'value' => $current_value ];
+				$optionAttrs['selected'] = 'selected';
+				$optionLabel = $current_value;
+				$optionsText .= Html::element( 'option', $optionAttrs, $optionLabel );
+			}
+		}
+
+		$text = "\n\t" . Html::rawElement( 'select', $inputAttrs, $optionsText ) . "\n";
+		$text .= Html::hidden( $input_name . '[is_list]', 1 );
 
 		if ( array_key_exists( 'uploadable', $other_args ) && $other_args['uploadable'] == true ) {
 			if ( array_key_exists( 'default filename', $other_args ) ) {
@@ -166,44 +226,44 @@ class PFTokensInput extends PFFormInput {
 		if ( $is_mandatory ) {
 			$spanClass .= ' mandatoryFieldSpan';
 		}
-		$text = "\n" . Html::rawElement( 'span', array( 'class' => $spanClass ), $text );
+		$text = "\n" . Html::rawElement( 'span', [ 'class' => $spanClass ], $text );
 
 		return $text;
 	}
 
 	public static function getParameters() {
 		$params = parent::getParameters();
-		$params[] = array(
+		$params[] = [
 			'name' => 'size',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_size' )->text()
-		);
-		$params[] = array(
+		];
+		$params[] = [
 			'name' => 'placeholder',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_placeholder' )->text()
-		);
-		$params[] = array(
+		];
+		$params[] = [
 			'name' => 'existing values only',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_existingvaluesonly' )->text()
-		);
-		$params[] = array(
+		];
+		$params[] = [
 			'name' => 'max values',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_maxvalues' )->text()
-		);
+		];
 		$params = array_merge( $params, PFTextWithAutocompleteInput::getAutocompletionParameters() );
-		$params[] = array(
+		$params[] = [
 			'name' => 'uploadable',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_uploadable' )->text()
-		);
-		$params[] = array(
+		];
+		$params[] = [
 			'name' => 'default filename',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_defaultfilename' )->text()
-		);
+		];
 
 		return $params;
 	}
@@ -212,7 +272,7 @@ class PFTokensInput extends PFFormInput {
 	 * Returns the HTML code to be included in the output page for this input.
 	 * @return string
 	 */
-	public function getHtmlText() {
+	public function getHtmlText(): string {
 		return self::getHTML(
 			$this->mCurrentValue,
 			$this->mInputName,

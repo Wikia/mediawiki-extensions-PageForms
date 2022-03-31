@@ -6,7 +6,8 @@
 
 function setupMapFormInput( inputDiv, mapService ) {
 	var map, marker, markers, mapCanvas, mapOptions;
-	var numClicks = 0, timer = null;
+	var imageHeight = null, imageWidth = null;
+	var numClicks = 0, timer = null, geocoder;
 
 	if ( mapService === "Google Maps" ) {
 		mapCanvas = inputDiv.find('.pfMapCanvas')[0];
@@ -15,7 +16,7 @@ function setupMapFormInput( inputDiv, mapService ) {
 			center: new google.maps.LatLng(0,0)
 		};
 		map = new google.maps.Map(mapCanvas, mapOptions);
-		var geocoder = new google.maps.Geocoder();
+		geocoder = new google.maps.Geocoder();
 
 		// Let a click set the marker, while keeping the default
 		// behavior (zoom and center) for double clicks.
@@ -32,14 +33,28 @@ function setupMapFormInput( inputDiv, mapService ) {
 		mapCanvas = inputDiv.find('.pfMapCanvas').get(0);
 		mapOptions = {
 			zoom: 1,
-			center: [0, 0]
+			center: [ 0, 0 ]
 		};
 		var layerOptions = {
 			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 		};
 
+		var imageUrl = inputDiv.attr('data-image-path');
+		if ( imageUrl !== undefined ) {
+			imageHeight = inputDiv.attr('data-height');
+			imageWidth = inputDiv.attr('data-width');
+			mapOptions.crs = L.CRS.Simple;
+		}
+
 		map = L.map(mapCanvas, mapOptions);
-		new L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', layerOptions).addTo(map);
+
+		if ( imageUrl !== undefined ) {
+			var imageBounds = [ [ 0, 0 ], [ imageHeight, imageWidth ] ];
+			L.imageOverlay(imageUrl, imageBounds).addTo(map);
+			map.fitBounds(imageBounds);
+		} else {
+			new L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', layerOptions).addTo(map);
+		}
 
 		map.on( 'click', function( event ) {
 			// Place/move the marker only on a single click, not a
@@ -57,9 +72,32 @@ function setupMapFormInput( inputDiv, mapService ) {
 			}
 		});
 	} else { // if ( mapService === "OpenLayers" ) {
-		var mapCanvasID = inputDiv.find('.pfMapCanvas').attr('id');
+		mapCanvas = inputDiv.find('.pfMapCanvas');
+		var mapCanvasID = mapCanvas.attr('id');
+		if ( mapCanvasID === undefined ) {
+			// If no ID is set, it's probably in a multiple-
+			// instance template; just set the ID to a random
+			// string, so we can attach the map to it.
+			mapCanvasID = mapCanvas.attr('data-origID') + '-' +
+				Math.random().toString(36).substring(2, 15);
+			mapCanvas.attr('ID', mapCanvasID);
+		}
 		map = new OpenLayers.Map( mapCanvasID );
-		map.addLayer( new OpenLayers.Layer.OSM() );
+		// We do this more complex initialization, rather than just
+		// calling OpenLayers.Layer.OSM(), so that the tiles will be
+		// loaded via either HTTP or HTTPS, depending on what we are
+		// using.
+		map.addLayer( new OpenLayers.Layer.OSM(
+			"OpenStreetMap",
+			// Official OSM tileset as protocol-independent URLs
+			[
+				'//a.tile.openstreetmap.org/${z}/${x}/${y}.png',
+				'//b.tile.openstreetmap.org/${z}/${x}/${y}.png',
+				'//c.tile.openstreetmap.org/${z}/${x}/${y}.png'
+			],
+			null
+		) );
+
 		map.zoomTo(0);
 		markers = new OpenLayers.Layer.Markers( "Markers" );
 		map.addLayer( markers );
@@ -95,22 +133,22 @@ function setupMapFormInput( inputDiv, mapService ) {
 	coordsInput.keydown( function( e ) {
 		if ( ! coordsInput.hasClass( 'modifiedInput' ) ) {
 			coordsInput.addClass( 'modifiedInput' );
-			var checkMark = $('<a></a>').addClass( 'pfCoordsCheckMark' ).css( 'color', 'green' ).html( '&#10004;' );
-			var xMark = $('<a></a>').addClass( 'pfCoordsX' ).css( 'color', 'red' ).html( '&#10008;' );
-			var marksDiv = $('<span></span>').addClass( 'pfCoordsInputHelpers' )
-				.append( checkMark ).append( ' ' ).append( xMark );
-			coordsInput.parent().append( marksDiv );
+			var $checkMark = $('<a></a>').addClass( 'pfCoordsCheckMark' ).css( 'color', 'green' ).html( '&#10004;' );
+			var $xMark = $('<a></a>').addClass( 'pfCoordsX' ).css( 'color', 'red' ).html( '&#10008;' );
+			var $marksDiv = $('<span></span>').addClass( 'pfCoordsInputHelpers' )
+				.append( $checkMark ).append( ' ' ).append( $xMark );
+			coordsInput.parent().append( $marksDiv );
 
-			checkMark.click( function() {
+			$checkMark.click( function() {
 				setMarkerFromCoordinates();
 				coordsInput.removeClass( 'modifiedInput' );
-				marksDiv.remove();
+				$marksDiv.remove();
 			});
 
-			xMark.click( function() {
+			$xMark.click( function() {
 				coordsInput.removeClass( 'modifiedInput' )
 					.val( coordsInput.attr('data-original-value') );
-				marksDiv.remove();
+				$marksDiv.remove();
 			});
 		}
 	});
@@ -131,8 +169,14 @@ function setupMapFormInput( inputDiv, mapService ) {
 
 
 	if ( coordsInput.val() != '' ) {
+		if ( mapService == 'OpenLayers' ) {
+			map.zoomTo( 14 );
+		} else {
+			map.setZoom( 14 );
+		}
+		// This has to be called after the zooming, for the OpenLayers
+		// zoom to work correctly.
 		setMarkerFromCoordinates();
-		map.setZoom( 14 );
 	} else {
 		if ( coordsInput.attr('data-bound-coords') ) {
 			var boundCoords = coordsInput.attr('data-bound-coords');
@@ -151,26 +195,36 @@ function setupMapFormInput( inputDiv, mapService ) {
 				lat2 < -90 || lat2 > 90 || lon2 < -180 || lon2 > 180 ) {
 				return;
 			}
-			var bound1 = new google.maps.LatLng(lat1, lon1);
-			var bound2 = new google.maps.LatLng(lat2, lon2);
-			var bounds = new google.maps.LatLngBounds();
-			bounds.extend(bound1);
-			bounds.extend(bound2);
-			map.fitBounds(bounds);
+			if ( mapService === "Google Maps" ) {
+				var bound1 = new google.maps.LatLng(lat1, lon1);
+				var bound2 = new google.maps.LatLng(lat2, lon2);
+				let bounds = new google.maps.LatLngBounds();
+				bounds.extend(bound1);
+				bounds.extend(bound2);
+				map.fitBounds(bounds);
+			} else if ( mapService === "Leaflet" ){
+				map.fitBounds([ [ lat1, lon1 ], [ lat2, lon2 ] ]);
+			} else { // if ( mapService === "OpenLayers" ) {
+				let fromProjection = new OpenLayers.Projection("EPSG:4326"); // transform from WGS 1984
+				let toProjection = map.getProjectionObject(); // to Spherical Mercator Projection
+				let bounds = new OpenLayers.Bounds(lon1, lat1, lon2, lat2).transform(fromProjection,toProjection);
+				map.zoomToExtent(bounds);
+			}
 		}
 	}
 
 	function setMarkerFromAddress() {
 		var currentMapName = coordsInput.attr('name');
+		var addressText;
 		var allFeedersForCurrentMap = jQuery('[data-feeds-to-map="' + currentMapName + '"]').map( function() {
 			return $( this ).val()
 		}).get();
 		if ( allFeedersForCurrentMap.length > 0 ) {
 			// Assemble a single string from all the address inputs that feed to this map.
-			var addressText = allFeedersForCurrentMap.join( ', ' );
+			addressText = allFeedersForCurrentMap.join( ', ' );
 		} else {
 			// No other inputs feed to this map, so use the standard "Enter address here" input.
-			var addressText = inputDiv.find('.pfAddressInput').val();
+			addressText = inputDiv.find('.pfAddressInput input').val();
 		}
 		if ( mapService === "Google Maps" ) {
 			geocoder.geocode( { 'address': addressText }, function(results, status) {
@@ -205,14 +259,14 @@ function setupMapFormInput( inputDiv, mapService ) {
 					var olPoint = toOpenLayersLonLat( map, lat, lon );
 					openLayersSetMarker( olPoint );
 					map.setCenter( olPoint );
-					var fromProjection = new OpenLayers.Projection("EPSG:4326"); // transform from WGS 1984
-					var toProjection = map.getProjectionObject(); // to Spherical Mercator Projection
-					var bounds = new OpenLayers.Bounds(left,bottom,right,top).transform(fromProjection,toProjection);
+					let fromProjection = new OpenLayers.Projection("EPSG:4326"); // transform from WGS 1984
+					let toProjection = map.getProjectionObject(); // to Spherical Mercator Projection
+					let bounds = new OpenLayers.Bounds(left,bottom,right,top).transform(fromProjection,toProjection);
 					map.zoomToExtent(bounds);
 				} else if ( mapService === "Leaflet" ) {
 					var lPoint = L.latLng( lat, lon );
 					leafletSetMarker( lPoint );
-					map.fitBounds([[bottom, left], [top, right]]);
+					map.fitBounds([ [ bottom, left ], [ top, right ] ]);
 				}
 			});
 		}
@@ -240,9 +294,15 @@ function setupMapFormInput( inputDiv, mapService ) {
 			googleMapsSetMarker( gmPoint );
 			map.setCenter( gmPoint );
 		} else if ( mapService === "Leaflet" ){
+			if ( imageHeight !== null && imageWidth !== null ) {
+				lat *= imageWidth / 100;
+				lon *= imageWidth / 100;
+			}
 			var lPoint = L.latLng( lat, lon );
 			leafletSetMarker( lPoint );
-			map.setView( lPoint, 14 );
+			if ( imageHeight == null && imageWidth == null ) {
+				map.setView( lPoint, 14 );
+			}
 		} else { // if ( mapService === "OpenLayers" ) {
 			var olPoint = toOpenLayersLonLat( map, lat, lon );
 			openLayersSetMarker( olPoint );
@@ -250,17 +310,20 @@ function setupMapFormInput( inputDiv, mapService ) {
 		}
 	}
 
-	function toOpenLayersLonLat( map, lat, lon ) {
+	function toOpenLayersLonLat( maps, lat, lon ) {
 		return new OpenLayers.LonLat( lon, lat ).transform(
 			new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
-			map.getProjectionObject() // to Spherical Mercator Projection
+			maps.getProjectionObject() // to Spherical Mercator Projection
 		);
 	}
 
 	/**
- 	 * Round off a number to five decimal places - that's the most
- 	 * we need for coordinates, one would think.
- 	 */
+	 * Round off a number to five decimal places - that's the most
+	 * we need for coordinates, one would think.
+	 *
+	 * @param {Mixed} num
+	 * @return {Mixed}
+	 */
 	function pfRoundOffDecimal( num ) {
 		return Math.round( num * 100000 ) / 100000;
 	}
@@ -295,8 +358,26 @@ function setupMapFormInput( inputDiv, mapService ) {
 		marker.dragging.enable();
 
 		function setInput() {
-			var stringVal = pfRoundOffDecimal( marker.getLatLng().lat ) + ', ' +
-				pfRoundOffDecimal( marker.getLatLng().lng );
+			var lat = marker.getLatLng().lat;
+			var lng = marker.getLatLng().lng;
+			if ( imageHeight == null && imageWidth == null ) {
+				// Normal map.
+				// Leaflet permits longitude beyond ±180, so
+				// we have to normalize this here.
+				// Google Maps and OpenLayers don't have this
+				// issue.
+				while ( lng < -180 ) {
+					lng += 360;
+				}
+				while ( lng > 180 ) {
+					lng -= 360;
+				}
+			} else {
+				lat *= 100 / imageWidth;
+				lng *= 100 / imageWidth;
+			}
+			var stringVal = pfRoundOffDecimal( lat ) + ', ' +
+				pfRoundOffDecimal( lng );
 			coordsInput.val( stringVal )
 				.attr( 'data-original-value', stringVal )
 				.removeClass( 'modifiedInput' )
@@ -333,12 +414,35 @@ function setupMapFormInput( inputDiv, mapService ) {
 
 jQuery(document).ready( function() {
 	jQuery(".pfGoogleMapsInput").each( function() {
+		// Ignore the hidden "starter" div in multiple-instance templates.
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
 		setupMapFormInput( jQuery(this), "Google Maps" );
 	});
 	jQuery(".pfLeafletInput").each( function() {
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
 		setupMapFormInput( jQuery(this), "Leaflet" );
 	});
 	jQuery(".pfOpenLayersInput").each( function() {
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
+		setupMapFormInput( jQuery(this), "OpenLayers" );
+	});
+});
+
+// Activate maps in a new instance of a multiple-instance template.
+mw.hook('pf.addTemplateInstance').add( function( $newInstance ) {
+	$newInstance.find(".pfGoogleMapsInput").each( function() {
+		setupMapFormInput( jQuery(this), "Google Maps" );
+	});
+	$newInstance.find(".pfLeafletInput").each( function() {
+		setupMapFormInput( jQuery(this), "Leaflet" );
+	});
+	$newInstance.find(".pfOpenLayersInput").each( function() {
 		setupMapFormInput( jQuery(this), "OpenLayers" );
 	});
 });

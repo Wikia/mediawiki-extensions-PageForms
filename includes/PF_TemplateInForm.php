@@ -8,13 +8,18 @@
 class PFTemplateInForm {
 	private $mTemplateName;
 	private $mLabel;
+	private $mIntro;
 	private $mAddButtonText;
 	private $mDisplay;
+	private $mEventTitleField;
+	private $mEventDateField;
+	private $mEventStartDateField;
+	private $mEventEndDateField;
 	private $mAllowMultiple;
 	private $mStrictParsing;
 	private $mMinAllowed;
 	private $mMaxAllowed;
-	private $mFields;
+	private $mFields = [];
 	private $mEmbedInTemplate;
 	private $mEmbedInField;
 	private $mPlaceholder;
@@ -32,19 +37,18 @@ class PFTemplateInForm {
 	private $mSearchTemplateStr;
 	private $mPregMatchTemplateStr;
 	private $mFullTextInPage;
-	private $mValuesFromPage = array();
-	private $mValuesFromSubmit;
+	private $mValuesFromPage = [];
+	private $mValuesFromSubmit = [];
 	private $mNumInstancesFromSubmit = 0;
 	private $mPageCallsThisTemplate = false;
 	private $mInstanceNum = 0;
 	private $mAllInstancesPrinted = false;
-	private $mGridValues = array();
+	private $mGridValues = [];
 
 	static function create( $name, $label = null, $allowMultiple = null, $maxAllowed = null, $formFields = null ) {
 		$tif = new PFTemplateInForm();
 		$tif->mTemplateName = str_replace( '_', ' ', $name );
-		$tif->mFields = array();
-		if ( is_null( $formFields ) ) {
+		if ( $formFields === null ) {
 			$template = PFTemplate::newFromName( $tif->mTemplateName );
 			$fields = $template->getTemplateFields();
 			foreach ( $fields as $field ) {
@@ -60,13 +64,21 @@ class PFTemplateInForm {
 	}
 
 	public static function newFromFormTag( $tag_components ) {
-		global $wgParser;
+		global $wgPageFormsEmbeddedTemplates;
 
-		$template_name = str_replace( '_', ' ', trim( $wgParser->recursiveTagParse( $tag_components[1] ) ) );
+		$parser = PFUtils::getParser();
+
 		$tif = new PFTemplateInForm();
-		$tif->mTemplateName = str_replace( '_', ' ', $template_name );
+		$tif->mTemplateName = str_replace( '_', ' ', trim( $parser->recursiveTagParse( $tag_components[1] ) ) );
 
 		$tif->mAddButtonText = wfMessage( 'pf_formedit_addanother' )->text();
+
+		if ( array_key_exists( $tif->mTemplateName, $wgPageFormsEmbeddedTemplates ) ) {
+			list( $tif->mEmbedInTemplate, $tif->mEmbedInField ) =
+				$wgPageFormsEmbeddedTemplates[$tif->mTemplateName];
+			$tif->mPlaceholder = PFFormPrinter::placeholderFormat( $tif->mEmbedInTemplate, $tif->mEmbedInField );
+		}
+
 		// Cycle through the other components.
 		for ( $i = 2; $i < count( $tag_components ); $i++ ) {
 			$component = $tag_components[$i];
@@ -78,13 +90,15 @@ class PFTemplateInForm {
 			$sub_components = array_map( 'trim', explode( '=', $component, 2 ) );
 			if ( count( $sub_components ) == 2 ) {
 				if ( $sub_components[0] == 'label' ) {
-					$tif->mLabel = $wgParser->recursiveTagParse( $sub_components[1] );
+					$tif->mLabel = $parser->recursiveTagParse( $sub_components[1] );
+				} elseif ( $sub_components[0] == 'intro' ) {
+					$tif->mIntro = $sub_components[1];
 				} elseif ( $sub_components[0] == 'minimum instances' ) {
 					$tif->mMinAllowed = $sub_components[1];
 				} elseif ( $sub_components[0] == 'maximum instances' ) {
 					$tif->mMaxAllowed = $sub_components[1];
 				} elseif ( $sub_components[0] == 'add button text' ) {
-					$tif->mAddButtonText = $wgParser->recursiveTagParse( $sub_components[1] );
+					$tif->mAddButtonText = $parser->recursiveTagParse( $sub_components[1] );
 				} elseif ( $sub_components[0] == 'embed in field' ) {
 					// Placeholder on form template level. Assume that the template form def
 					// will have a multiple+placeholder parameters, and get the placeholder value.
@@ -102,6 +116,14 @@ class PFTemplateInForm {
 					$tif->mHeight = $sub_components[1];
 				} elseif ( $sub_components[0] == 'displayed fields when minimized' ) {
 					$tif->mDisplayedFieldsWhenMinimized = $sub_components[1];
+				} elseif ( $sub_components[0] == 'event title field' ) {
+					$tif->mEventTitleField = $sub_components[1];
+				} elseif ( $sub_components[0] == 'event date field' ) {
+					$tif->mEventDateField = $sub_components[1];
+				} elseif ( $sub_components[0] == 'event start date field' ) {
+					$tif->mEventStartDateField = $sub_components[1];
+				} elseif ( $sub_components[0] == 'event end date field' ) {
+					$tif->mEventEndDateField = $sub_components[1];
 				}
 			}
 		}
@@ -133,12 +155,32 @@ class PFTemplateInForm {
 		return $this->mLabel;
 	}
 
+	function getIntro() {
+		return $this->mIntro;
+	}
+
 	function getAddButtonText() {
 		return $this->mAddButtonText;
 	}
 
 	function getDisplay() {
 		return $this->mDisplay;
+	}
+
+	function getEventTitleField() {
+		return $this->mEventTitleField;
+	}
+
+	function getEventDateField() {
+		return $this->mEventDateField;
+	}
+
+	function getEventStartDateField() {
+		return $this->mEventStartDateField;
+	}
+
+	function getEventEndDateField() {
+		return $this->mEventEndDateField;
 	}
 
 	function getPlaceholder() {
@@ -177,14 +219,14 @@ class PFTemplateInForm {
 		// For now, HTML for templates differs for multiple-instance
 		// templates; this may change if handling of form definitions
 		// gets more sophisticated.
-		if ( ! $this->mAllowMultiple ) {
+		if ( !$this->mAllowMultiple ) {
 			$text .= "{| class=\"formtable\"\n";
 		}
 		foreach ( $this->mFields as $i => $field ) {
 			$is_last_field = ( $i == count( $this->mFields ) - 1 );
 			$text .= $field->createMarkup( $this->mAllowMultiple, $is_last_field );
 		}
-		if ( ! $this->mAllowMultiple ) {
+		if ( !$this->mAllowMultiple ) {
 			$text .= "|}\n";
 		}
 		$text .= "{{{end template}}}\n";
@@ -234,8 +276,8 @@ class PFTemplateInForm {
 	}
 
 	function addGridValue( $field_name, $cur_value ) {
-		if ( ! array_key_exists( $this->mInstanceNum, $this->mGridValues ) ) {
-			$this->mGridValues[$this->mInstanceNum] = array();
+		if ( !array_key_exists( $this->mInstanceNum, $this->mGridValues ) ) {
+			$this->mGridValues[$this->mInstanceNum] = [];
 		}
 		$this->mGridValues[$this->mInstanceNum][$field_name] = $cur_value;
 	}
@@ -244,27 +286,49 @@ class PFTemplateInForm {
 		$this->mFields[] = $form_field;
 	}
 
+	// this makes it possible for += and -= to modify values based on existing values.
+	function changeFieldValues( $field_name, $new_value, $modifier = null ) {
+		$this->mValuesFromPage[$field_name] = $new_value;
+		if ( $modifier !== null && array_key_exists( $field_name . $modifier, $this->mValuesFromPage ) ) {
+			// clean up old values with + or - in them from the array
+			unset( $this->mValuesFromPage[$field_name . $modifier] );
+		}
+	}
+
 	function setFieldValuesFromSubmit() {
 		global $wgRequest;
 
-		$this->mValuesFromSubmit = null;
+		// Reset values for every new instance, if this is a
+		// multiple-instance template.
+		if ( $this->mInstanceNum > 0 ) {
+			$this->mValuesFromSubmit = [];
+		}
 
 		$query_template_name = str_replace( ' ', '_', $this->mTemplateName );
 		// Also replace periods with underlines, since that's what
 		// POST does to strings anyway.
 		$query_template_name = str_replace( '.', '_', $query_template_name );
 		// ...and escape apostrophes.
-		// (Or don't.)
+		//  (Or don't.)
 		// $query_template_name = str_replace( "'", "\'", $query_template_name );
 
 		$allValuesFromSubmit = $wgRequest->getArray( $query_template_name );
-		if ( is_null( $allValuesFromSubmit ) ) {
+		if ( $allValuesFromSubmit === null ) {
 			return;
 		}
 		// If this is a multiple-instance template, get the values for
 		// this instance of the template.
 		if ( $this->mAllowMultiple ) {
-			$valuesFromSubmitKeys = array();
+			// If this data came from a spreadsheet, unescape some characters.
+			$spreadsheetTemplates = $wgRequest->getArray( 'spreadsheet_templates' );
+			if ( is_array( $spreadsheetTemplates ) && array_key_exists( $query_template_name, $spreadsheetTemplates ) ) {
+				foreach ( $allValuesFromSubmit as &$rowValues ) {
+					foreach ( $rowValues as &$curValue ) {
+						$curValue = str_replace( [ '&lt;', '&gt;' ], [ '<', '>' ], $curValue );
+					}
+				}
+			}
+			$valuesFromSubmitKeys = [];
 			foreach ( array_keys( $allValuesFromSubmit ) as $key ) {
 				if ( $key != 'num' ) {
 					$valuesFromSubmitKeys[] = $key;
@@ -285,55 +349,65 @@ class PFTemplateInForm {
 	}
 
 	/**
-	 * Change "non-template pipes", i.e. pipes that do not separate
-	 * between template params but rather are contained within tag
-	 * functions, into another character, so that they don't get
-	 * handled and can be changed back into pipes later.
-	 * (This doesn't include pipes contained within curly bracket
-	 * parser functions - those are handled separately.)
+	 * Remove all the bits that should not be parsed - those
+	 * contained in <pre> tags, etc. - and place them in an array,
+	 * so that they can be added back in later. This will prevent
+	 * the brackets, curly braces and pipes within those bits from
+	 * interfering with the parsing we need to do.
 	 *
 	 * @param string $str
+	 * @param string[] &$replacements
 	 * @return string
 	 */
-	static function escapeNonTemplatePipes( $str ) {
-		$startAndEndTags = array(
-			array( '<pre', 'pre>' ),
-			array( '<syntaxhighlight', 'syntaxhighlight>' ),
-			array( '<source', 'source>' ),
-			array( '<ref', 'ref>' )
-		);
-
+	static function removeUnparsedText( $str, &$replacements ) {
+		$startAndEndTags = [
+			[ '<pre', 'pre>' ],
+			[ '<syntaxhighlight', 'syntaxhighlight>' ],
+			[ '<source', 'source>' ],
+			[ '<ref', 'ref>' ],
+			[ '<nowiki', 'nowiki>' ]
+		];
 		foreach ( $startAndEndTags as $tags ) {
 			list( $startTag, $endTag ) = $tags;
-			$pattern = "/($startTag.*)\|(.*$endTag)/mis";
-			while ( preg_match( $pattern, $str, $matches ) ) {
-				// Special handling, to avoid escaping pipes
-				// within a string that looks like:
-				// startTag ... endTag | startTag ... endTag
-				if ( strpos( $matches[1], $endTag ) &&
-					strpos( $matches[2], $startTag ) ) {
-					$str = preg_replace( $pattern, "$1" . "\2" . "$2", $str );
-				} else {
-					$str = preg_replace( $pattern, "$1" . "\1" . "$2", $str );
+
+			$startTagLoc = -1;
+			while ( ( $startTagLoc + strlen( $startTag ) < strlen( $str ) ) && // Avoid PHP warnings
+				( ( $startTagLoc = strpos( $str, $startTag, $startTagLoc + strlen( $startTag ) ) ) !== false ) ) {
+				// Ignore "singleton" tags, like '<ref name="abc" />'.
+				$possibleSingletonTagEnd = strpos( $str, '/>', $startTagLoc );
+				if ( $possibleSingletonTagEnd !== false && $possibleSingletonTagEnd < strpos( $str, '>', $startTagLoc ) ) {
+					continue;
 				}
+				$endTagLoc = strpos( $str, $endTag, $startTagLoc + strlen( $startTag ) );
+				// Also ignore unclosed tags.
+				if ( $endTagLoc === false ) {
+					continue;
+				}
+				$fullTagTextLength = $endTagLoc + strlen( $endTag ) - $startTagLoc;
+				$replacements[] = substr( $str, $startTagLoc, $fullTagTextLength );
+				$replacementNum = count( $replacements ) - 1;
+				$str = substr_replace( $str, "\1" . $replacementNum . "\2", $startTagLoc, $fullTagTextLength );
 			}
 		}
-		// Change the "true" pipes back into pipes.
-		$str = str_replace( "\2", '|', $str );
 		return $str;
 	}
 
 	/**
 	 * @param string $str
+	 * @param string[] $replacements
 	 * @return string
 	 */
-	static function unescapeNonTemplatePipes( $str ) {
-		return str_replace( "\1", '|', $str );
+	static function restoreUnparsedText( $str, $replacements ) {
+		foreach ( $replacements as $i => $fullTagText ) {
+			$str = str_replace( "\1" . $i . "\2", $fullTagText, $str );
+		}
+		return $str;
 	}
 
 	function setFieldValuesFromPage( $existing_page_content ) {
-		$existing_page_content = self::escapeNonTemplatePipes( $existing_page_content );
-		$matches = array();
+		$unparsedTextReplacements = [];
+		$existing_page_content = self::removeUnparsedText( $existing_page_content, $unparsedTextReplacements );
+		$matches = [];
 		$search_pattern = '/{{' . $this->mPregMatchTemplateStr . '\s*[\|}]/i';
 		$content_str = str_replace( '_', ' ', $existing_page_content );
 		preg_match( $search_pattern, $content_str, $matches, PREG_OFFSET_CAPTURE );
@@ -342,29 +416,39 @@ class PFTemplateInForm {
 			$start_char = $matches[0][1];
 			$fields_start_char = $start_char + 2 + strlen( $this->mSearchTemplateStr );
 			// Skip ahead to the first real character.
-			while ( in_array( $existing_page_content[$fields_start_char], array( ' ', '\n' ) ) ) {
+			while ( in_array( $existing_page_content[$fields_start_char], [ ' ', '\n' ] ) ) {
 				$fields_start_char++;
 			}
 			// If the next character is a pipe, skip that too.
 			if ( $existing_page_content[$fields_start_char] == '|' ) {
 				$fields_start_char++;
 			}
-			$this->mValuesFromPage = array( '0' => '' );
+			$this->mValuesFromPage = [ '0' => '' ];
 			// Cycle through template call, splitting it up by pipes ('|'),
 			// except when that pipe is part of a piped link.
 			$field = "";
 			$uncompleted_square_brackets = 0;
 			$uncompleted_curly_brackets = 2;
 			$template_ended = false;
-			for ( $i = $fields_start_char; ! $template_ended && ( $i < strlen( $existing_page_content ) ); $i++ ) {
+			for ( $i = $fields_start_char; !$template_ended && ( $i < strlen( $existing_page_content ) ); $i++ ) {
 				$c = $existing_page_content[$i];
-				if ( $c == '[' ) {
+				if ( $i + 1 < strlen( $existing_page_content ) ) {
+					$nextc = $existing_page_content[$i + 1];
+				} else {
+					$nextc = null;
+				}
+				if ( $i > 0 ) {
+					$prevc = $existing_page_content[$i - 1];
+				} else {
+					$prevc = null;
+				}
+				if ( $c == '[' && ( $nextc == '[' || $prevc == '[' ) ) {
 					$uncompleted_square_brackets++;
-				} elseif ( $c == ']' && $uncompleted_square_brackets > 0 ) {
+				} elseif ( $c == ']' && ( $nextc == ']' || $prevc == ']' ) && $uncompleted_square_brackets > 0 ) {
 					$uncompleted_square_brackets--;
-				} elseif ( $c == '{' ) {
+				} elseif ( $c == '{' && ( $nextc == '{' || $prevc == '{' ) ) {
 					$uncompleted_curly_brackets++;
-				} elseif ( $c == '}' && $uncompleted_curly_brackets > 0 ) {
+				} elseif ( $c == '}' && ( $nextc == '}' || $prevc == '}' ) && $uncompleted_curly_brackets > 0 ) {
 					$uncompleted_curly_brackets--;
 				}
 				// handle an end to a field and/or template declaration
@@ -374,9 +458,9 @@ class PFTemplateInForm {
 					// If this was the last character in the template, remove
 					// the closing curly brackets.
 					if ( $template_ended ) {
-						$field = substr( $field, 0, - 1 );
+						$field = substr( $field, 0, -1 );
 					}
-					$field = self::unescapeNonTemplatePipes( $field );
+					$field = self::restoreUnparsedText( $field, $unparsedTextReplacements );
 					// Either there's an equals sign near the beginning or not -
 					// handling is similar in either way; if there's no equals
 					// sign, the index of this field becomes the key.
@@ -400,8 +484,9 @@ class PFTemplateInForm {
 			if ( $uncompleted_curly_brackets > 0 || $uncompleted_square_brackets > 0 ) {
 				throw new MWException( "PageFormsMismatchedBrackets" );
 			}
-			$existing_page_content = self::unescapeNonTemplatePipes( $existing_page_content );
-			$this->mFullTextInPage = substr( $existing_page_content, $start_char, $i - $start_char );
+
+			$fullText = substr( $existing_page_content, $start_char, $i - $start_char );
+			$this->mFullTextInPage = self::restoreUnparsedText( $fullText, $unparsedTextReplacements );
 		}
 	}
 
@@ -416,8 +501,8 @@ class PFTemplateInForm {
 		// searching on either.
 		$this->mSearchTemplateStr = str_replace( '_', ' ', $this->mTemplateName );
 		$this->mPregMatchTemplateStr = str_replace(
-			array( '/', '(', ')', '^' ),
-			array( '\/', '\(', '\)', '\^' ),
+			[ '/', '(', ')', '^' ],
+			[ '\/', '\(', '\)', '\^' ],
 			$this->mSearchTemplateStr );
 		$this->mPageCallsThisTemplate = preg_match( '/{{' . $this->mPregMatchTemplateStr . '\s*[\|}]/i', str_replace( '_', ' ', $existing_page_content ) );
 	}

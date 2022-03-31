@@ -2,6 +2,8 @@
 
 /**
  * @author Stephan Gambke
+ * @author Sam Wilson
+ * @author Amr El-Absy
  * @file
  * @ingroup PageForms
  */
@@ -9,10 +11,14 @@
 /**
  * @ingroup PageForms
  */
+
+use MediaWiki\Widget\DateTimeInputWidget;
+
 class PFDateTimePicker extends PFFormInput {
 
-	protected $mDatePicker;
-	protected $mTimePicker;
+	public static function getName(): string {
+		return 'datetimepicker';
+	}
 
 	/**
 	 * @param string $input_number The number of the input in the form.
@@ -23,90 +29,11 @@ class PFDateTimePicker extends PFFormInput {
 	 *  input definition.
 	 */
 	public function __construct( $input_number, $cur_value, $input_name, $disabled, array $other_args ) {
-		if ( $cur_value == 'now' ) {
-			$cur_value = date( 'Y/m/d H:i' ); // include hours and minutes
+		if ( $cur_value != '' ) {
+			list( $year, $month, $day, $time ) = PFDateInput::parseDate( $cur_value, true );
+			$cur_value = sprintf( '%04d-%02d-%02dT%sZ', $year, $month, $day, $time );
 		}
 		parent::__construct( $input_number, $cur_value, $input_name, $disabled, $other_args );
-
-		// prepare sub-inputs
-
-		$this->mOtherArgs["part of dtp"] = true;
-
-		// find allowed values and keep only the date portion
-		if ( array_key_exists( 'possible_values', $this->mOtherArgs ) &&
-			count( $this->mOtherArgs[ 'possible_values' ] )
-		) {
-			$this->mOtherArgs[ 'possible_values' ] = preg_replace(
-				'/^\s*(\d{4}\/\d{2}\/\d{2}).*/',
-				'$1',
-				$this->mOtherArgs[ 'possible_values' ]
-			);
-		}
-
-		$dateTimeString = trim( $this->mCurrentValue );
-		$dateString = '';
-		$timeString = '';
-
-		$separatorPos = strpos( $dateTimeString, " " );
-
-		if ( $dateTimeString == 'now' ) {
-			$dateString = $timeString = 'now';
-
-		// does it have a separating whitespace? assume it's a date & time
-		} elseif ( $separatorPos ) {
-			$dateString = substr( $dateTimeString, 0, $separatorPos );
-			$timeString = substr( $dateTimeString, $separatorPos + 1 );
-
-		// does it start with a time of some kind?
-		} elseif ( preg_match( '/^\d?\d:\d\d/', $dateTimeString ) ) {
-			$timeString = $dateTimeString;
-
-		// if all else fails assume it's a date
-		} else {
-			$dateString = $dateTimeString;
-		}
-
-		$this->mDatePicker = new PFDatePickerInput( $this->mInputNumber . '_dp', $dateString, $this->mInputName, $this->mIsDisabled, $this->mOtherArgs );
-		$this->mTimePicker = new PFTimePickerInput( $this->mInputNumber . '_tp', $timeString, $this->mInputName, $this->mIsDisabled, $this->mOtherArgs );
-
-		// add JS data
-		$this->addJsInitFunctionData( 'PF_DTP_init', $this->setupJsInitAttribs() );
-	}
-
-	/**
-	 * Returns the name of the input type this class handles: menuselect.
-	 *
-	 * This is the name to be used in the field definition for the "input
-	 * type" parameter.
-	 *
-	 * @return String The name of the input type this class handles.
-	 */
-	public static function getName() {
-		return 'datetimepicker';
-	}
-
-	protected function setupJsInitAttribs() {
-		$jsattribs = array();
-
-		$jsattribs['disabled'] = $this->mIsDisabled;
-
-		if ( array_key_exists( 'class', $this->mOtherArgs ) ) {
-			$jsattribs['userClasses'] = $this->mOtherArgs['class'];
-		} else {
-			$jsattribs['userClasses'] = '';
-		}
-
-		$jsattribs['subinputs'] =
-			$this->mDatePicker->getHtmlText() . " " .
-			$this->mTimePicker->getHtmlText();
-
-		$jsattribs['subinputsInitData'] = array(
-			'input_' . $this->mInputNumber . '_dp' => $this->mDatePicker->getJsInitFunctionData(),
-			'input_' . $this->mInputNumber . '_tp' => $this->mTimePicker->getJsInitFunctionData()
-		);
-
-		// build JS code from attributes array
-		return $jsattribs;
 	}
 
 	/**
@@ -117,12 +44,25 @@ class PFDateTimePicker extends PFFormInput {
 	 * should be able to input values.
 	 * @return string
 	 */
-	public function getHtmlText() {
-		$html = '<span class="inputSpan' . ( array_key_exists( 'mandatory', $this->mOtherArgs ) ? ' mandatoryFieldSpan' : '' ) . '">' .
-			PFDatePickerInput::genericTextHTML( $this->mCurrentValue, $this->mInputName, $this->mIsDisabled, $this->mOtherArgs, 'input_' . $this->mInputNumber ) .
-			'</span>';
+	public function getHtmlText(): string {
+		$widget = new DateTimeInputWidget( [
+			'type' => 'datetime',
+			'name' => $this->mInputName,
+			'value' => $this->mCurrentValue,
+			'id' => 'input_' . $this->mInputNumber,
+			'classes' => [ 'pfDateTimePicker', 'pfPicker' ],
+			'infusable' => true
+		] );
+		$text = $widget->toString();
 
-		return $html;
+		// We need a wrapper div so that OOUI won't override
+		// any classes added by "show on select".
+		$wrapperClass = 'pfPickerWrapper';
+		if ( isset( $this->mOtherArgs[ 'mandatory' ] ) ) {
+			$wrapperClass .= ' mandatory';
+		}
+
+		return Html::rawElement( 'div', [ 'class' => $wrapperClass ], $text );
 	}
 
 	/**
@@ -131,7 +71,7 @@ class PFDateTimePicker extends PFFormInput {
 	 * @return string[]
 	 */
 	public static function getOtherPropTypesHandled() {
-		return array( '_str', '_dat' );
+		return [ '_str', '_dat' ];
 	}
 
 	/**
@@ -144,37 +84,23 @@ class PFDateTimePicker extends PFFormInput {
 			PFDatePickerInput::getParameters()
 		);
 
-		// Copied from PFTimePickerInput, which was not moved
-		// over to Page Forms.
-		$params['mintime'] = array(
+		$params['mintime'] = [
 			'name' => 'mintime',
 			'type' => 'string',
 			'description' => wfMessage( 'pageforms-timepicker-mintime' )->text(),
-		);
-		$params['maxtime'] = array(
+		];
+		$params['maxtime'] = [
 			'name' => 'maxtime',
 			'type' => 'string',
 			'description' => wfMessage( 'pageforms-timepicker-maxtime' )->text(),
-		);
-		$params['interval'] = array(
+		];
+		$params['interval'] = [
 			'name' => 'interval',
 			'type' => 'int',
 			'description' => wfMessage( 'pageforms-timepicker-interval' )->text(),
-		);
+		];
 
 		return $params;
-	}
-
-	/**
-	 * Returns the name and parameters for the validation JavaScript
-	 * functions for this input type, if any.
-	 * @return array
-	 */
-	public function getJsValidationFunctionData() {
-		return array_merge(
-			$this->mJsValidationFunctionData,
-			$this->mDatePicker->getJsValidationFunctionData()
-		);
 	}
 
 	/**
@@ -186,7 +112,7 @@ class PFDateTimePicker extends PFFormInput {
 	 * @return null|string|array
 	 */
 	public function getResourceModuleNames() {
-		return array( 'ext.pageforms.timepicker', 'ext.pageforms.datetimepicker' );
+		return [ 'ext.pageforms.datetimepicker' ];
 	}
 
 }

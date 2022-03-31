@@ -10,31 +10,33 @@
 
 	'use strict';
 
-	var form;
-	var previewpane;
+	var $form;
+	var $previewpane;
 	var previewHeight;
 
 	/**
 	 * Called when the content is loaded into the preview pane
+	 *
+	 * @return {Mixed}
 	 */
 	var loadFrameHandler = function handleLoadFrame() {
 
-		var iframe = $( this );
-		var iframecontents = iframe.contents();
+		var $iframe = $( this );
+		var $iframecontents = $iframe.contents();
 
 		// find div containing the preview
-		var content = iframecontents.find( '#wikiPreview' );
+		var $content = $iframecontents.find( '#wikiPreview' );
 
-		var iframebody = content.closest( 'body' );
-		var iframedoc = iframebody.parent();
-		iframedoc.height( 'auto' );
+		var $iframebody = $content.closest( 'body' );
+		var $iframedoc = $iframebody.parent();
+		$iframedoc.height( 'auto' );
 
 		// this is not a normal MW page (or it uses an unknown skin)
-		if ( content.length === 0 ) {
-			content = iframebody;
+		if ( $content.length === 0 ) {
+			$content = $iframebody;
 		}
 
-		content.parentsUntil( 'html' ).andSelf()
+		$content.parentsUntil( 'html' ).addBack()
 		.css( {
 			margin: 0,
 			padding: 0,
@@ -52,41 +54,47 @@
 		// and attach event handler to adjust frame size every time the window
 		// size changes
 		$( window ).resize( function () {
-			iframe.height( iframedoc.height() );
+			$iframe.height( $iframedoc.height() );
 		} );
 
-		previewpane.show();
+		$previewpane.show();
 
-		var newPreviewHeight = iframedoc.height();
+		var newPreviewHeight = $iframedoc.height();
 
-		iframe.height( newPreviewHeight );
+		$iframe.height( newPreviewHeight );
 
 		$( 'html, body' )
 		.scrollTop( $( 'html, body' ).scrollTop() + newPreviewHeight - previewHeight )
 		.animate( {
-			scrollTop: previewpane.offset().top
+			scrollTop: $previewpane.offset().top
 		}, 1000 );
 
 		previewHeight = newPreviewHeight;
+
+		$( function() {
+			window.dispatchEvent( new Event( 'resize' ) ); // It fixes form preview
+		} );
 
 		return false;
 	};
 
 	/**
 	 * Called when the server has sent the preview
+	 *
+	 * @param {Mixed} result
 	 */
 	var resultReceivedHandler = function handleResultReceived( result ) {
 
 		var htm = result.result;
 
-		var iframe = previewpane.children();
+		var $iframe = $previewpane.children();
 
-		if ( iframe.length === 0 ) {
+		if ( $iframe.length === 0 ) {
 
 			// set initial height of preview area
 			previewHeight = 0;
 
-			iframe = $( '<iframe>' )
+			$iframe = $( '<iframe>' )
 			.css( { //FIXME: Should this go in a style file?
 				'width': '100%',
 				'height': previewHeight,
@@ -94,11 +102,11 @@
 				'overflow': 'hidden'
 			} )
 			.load( loadFrameHandler )
-			.appendTo( previewpane );
+			.appendTo( $previewpane );
 
 		}
 
-		var ifr = iframe[0];
+		var ifr = $iframe[0];
 		var doc = ifr.contentDocument || ifr.contentWindow.document || ifr.Document;
 
 		doc.open();
@@ -137,22 +145,20 @@
 
 			if ( mw.util.getParamValue( 'form' ) ) {
 				data.form = mw.util.getParamValue( 'form' );
-			}
-			else if ( parts.length > 1 ) { // found a formname
+			} else if ( parts.length > 1 ) { // found a formname
 				data.form = parts[1];
 			}
 
 			if ( mw.util.getParamValue( 'target' ) ) {
 				data.target = mw.util.getParamValue( 'target' );
-			}
-			else if ( parts.length > 2 ) { // found a pagename
+			} else if ( parts.length > 2 ) { // found a pagename
 				// Put the name back together, if it contains slashes.
 				data.target = parts.slice(2).join( '/' );
 			}
 		}
 
 		// add form values to the data
-		data.query = form.serialize();
+		data.query = $form.serialize();
 
 		if ( data.query.length > 0 ) {
 			data.query += '&';
@@ -172,42 +178,26 @@
 
 	/**
 	 * Register plugin
+	 *
+	 *  @return {Mixed}
 	 */
 	$.fn.pfAjaxPreview = function () {
 
-		form = this.closest( 'form' );
-		previewpane = $( '#wikiPreview' );
+		$form = this.closest( 'form' );
+		$previewpane = $( '#wikiPreview' );
 
 		// do some sanity checks
-		if ( previewpane.length === 0 || // no ajax preview without preview area
-			previewpane.contents().length > 0 || // preview only on an empty previewpane
-			form.length === 0 ) { // no ajax preview without form
+		if ( $previewpane.length === 0 || // no ajax preview without preview area
+			$previewpane.contents().length > 0 || // preview only on an empty previewpane
+			$form.length === 0 ) { // no ajax preview without form
 
 			return this;
 		}
 
-		// IE does not allow setting of the 'type' attribute for inputs
-		// => completely replace the original preview button
-		var btn = $( '<input type=\'button\' />' ).insertBefore( this );
-
-		this.remove();
-
-		// copy all explicitly specified attributes (except 'type' attribute)
-		// from the old to the new button
-		var oldBtnElement = this[0];
-		var i;
-
-		for ( i = 0; i < oldBtnElement.attributes.length; i = i + 1 ) {
-			var attribute = oldBtnElement.attributes[i];
-			if ( attribute.name !== 'type' ) {
-				btn.attr( attribute.name,  attribute.value );
-			}
-		}
-
 		// register event handler
-		btn.click( previewButtonClickedHandler );
+		this.click( previewButtonClickedHandler );
 
-		return btn;
+		return this;
 	};
 
 	$( document ).ready( function () {
