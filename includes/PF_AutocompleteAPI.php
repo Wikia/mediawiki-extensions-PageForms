@@ -313,7 +313,7 @@ class PFAutocompleteAPI extends ApiBase {
 			$conditions, __METHOD__, $sqlOptions );
 
 		$values = [];
-		while ( $row = $db->fetchRow( $res ) ) {
+		while ( $row = $res->fetchRow() ) {
 			$values[] = str_replace( '_', ' ', array_shift( $row ) );
 		}
 		$res->free();
