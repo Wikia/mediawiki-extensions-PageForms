@@ -699,7 +699,7 @@ END;
 		// parsed twice.
 		if ( array_key_exists( 'is_list', $value ) ) {
 			unset( $value['is_list'] );
-			return str_replace( [ '<', '>' ], [ '&lt;', '&gt;' ], implode( "$delimiter ", $value ) );
+			return htmlentities( implode( "$delimiter ", $value ) );
 		}
 
 		// if it has 1 or 2 elements, assume it's a checkbox; if it has
@@ -1032,7 +1032,11 @@ END;
 					if ( $is_new_template ) {
 						$template = PFTemplate::newFromName( $template_name );
 						$tif = PFTemplateInForm::newFromFormTag( $tag_components );
-					}
+                    }
+                    // if template does not have any fields make $tif a dummy variable
+                    if ( $tif == null ) {
+                        $tif = new PFTemplateInForm();
+                    }
 					// Remove template tag.
 					$section = substr_replace( $section, '', $brackets_loc, $brackets_end_loc + 3 - $brackets_loc );
 					// If we are editing a page, and this

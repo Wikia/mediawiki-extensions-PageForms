@@ -198,8 +198,10 @@
 		if ( autocomplete_opts.autocompletedatatype !== undefined ) {
 			opts.ajax = this.getAjaxOpts();
 			opts.minimumInputLength = 1;
-			opts.language.inputTooShort = function() {
-				return mw.msg( "pf-autocomplete-input-too-short", opts.minimumInputLength );
+			opts.formatInputTooShort = "";
+			opts.formatSelection = this.formatSelection;
+			opts.escapeMarkup = function (m) {
+				return self.escapeMarkupAndAddHTML(m);
 			};
 		} else if ( input_tagname === "SELECT" ) {
 			opts.data = this.getData( autocomplete_opts.autocompletesettings );
