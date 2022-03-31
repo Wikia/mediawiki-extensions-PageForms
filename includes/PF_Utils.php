@@ -291,7 +291,7 @@ END;
 			array( 'ORDER BY' => 'page_title' ) );
 		$form_names = array();
 		while ( $row = $dbr->fetchRow( $res ) ) {
-			$form_names[] = str_replace( '_', ' ', $row[0] );
+			$form_names[] = str_replace( '_', ' ', $row['page_title'] );
 		}
 		$dbr->freeResult( $res );
 		return $form_names;

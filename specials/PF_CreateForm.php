@@ -80,7 +80,7 @@ class PFCreateForm extends SpecialPage {
 
 		if ( $db->numRows( $res ) > 0 ) {
 			while ( $row = $db->fetchRow( $res ) ) {
-				$template_name = str_replace( '_', ' ', $row[0] );
+				$template_name = str_replace( '_', ' ', $row['page_title'] );
 				$all_templates[] = $template_name;
 			}
 		}

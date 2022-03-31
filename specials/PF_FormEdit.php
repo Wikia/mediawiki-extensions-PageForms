@@ -45,15 +45,17 @@ class PFFormEdit extends UnlistedSpecialPage {
 		$fe = SpecialPageFactory::getPage( 'FormEdit' );
 		$fe_url = $fe->getPageTitle()->getFullURL();
 		$i = 0;
-		foreach ( $alt_forms as $alt_form ) {
-			if ( $i++ > 0 ) {
-				$text .= ', ';
-			}
-			$altFormURL = $fe_url . '/' . $alt_form . '/' . $target_name;
-			$text .= Html::element( 'a',
-				array( 'href' => $altFormURL ),
-				str_replace( '_', ' ', $alt_form )
-			);
+        if ( is_iterable( $alt_forms ) ) {
+            foreach ( $alt_forms as $alt_form ) {
+                if ( $i++ > 0 ) {
+                    $text .= ', ';
+                }
+                $altFormURL = $fe_url . '/' . $alt_form . '/' . $target_name;
+                $text .= Html::element( 'a',
+                    array( 'href' => $altFormURL ),
+                    str_replace( '_', ' ', $alt_form )
+                );
+            }
 		}
 		return $text;
 	}

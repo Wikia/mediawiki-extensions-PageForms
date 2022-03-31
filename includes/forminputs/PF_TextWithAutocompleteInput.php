@@ -100,7 +100,7 @@ class PFTextWithAutocompleteInput extends PFTextInput {
 		}
 		if ( array_key_exists( 'placeholder', $other_args ) ) {
 			$inputAttrs['placeholder'] = $other_args['placeholder'];
-		}
+        }
 
 		// The input value passed in to Html::input() cannot be an array.
 		if ( is_array( $cur_value ) ) {
