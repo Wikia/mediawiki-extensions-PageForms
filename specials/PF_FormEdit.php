@@ -23,6 +23,7 @@ class PFFormEdit extends UnlistedSpecialPage {
 
 	function execute( $query ) {
 		$this->setHeaders();
+		$this->getOutput()->enableOOUI();
 
 		$this->mForm = $this->getRequest()->getText( 'form' );
 		$this->mTarget = $this->getRequest()->getText( 'target' );
@@ -35,6 +36,9 @@ class PFFormEdit extends UnlistedSpecialPage {
 			$this->mTarget = str_replace( '_', ' ', $this->mTarget );
 		}
 
+		$this->mForm = trim( $this->mForm );
+		$this->mTarget = trim( $this->mTarget );
+
 		$alt_forms = $this->getRequest()->getArray( 'alt_form' );
 
 		$this->printForm( $this->mForm, $this->mTarget, $alt_forms );
@@ -42,23 +46,36 @@ class PFFormEdit extends UnlistedSpecialPage {
 
 	function printAltFormsList( $alt_forms, $target_name ) {
 		$text = "";
-		$fe = SpecialPageFactory::getPage( 'FormEdit' );
+		$fe = PFUtils::getSpecialPage( 'FormEdit' );
 		$fe_url = $fe->getPageTitle()->getFullURL();
 		$i = 0;
-		foreach ( $alt_forms as $alt_form ) {
-			if ( $i++ > 0 ) {
-				$text .= ', ';
+		if ( is_iterable( $alt_forms ) ) {
+			foreach ( $alt_forms as $alt_form ) {
+				if ( $i ++ > 0 ) {
+					$text .= ', ';
+				}
+				$altFormURL = $fe_url . '/' . $alt_form . '/' . $target_name;
+				$text .= Html::element( 'a',
+					[ 'href' => $altFormURL ],
+					str_replace( '_', ' ', $alt_form )
+				);
 			}
-			$altFormURL = $fe_url . '/' . $alt_form . '/' . $target_name;
-			$text .= Html::element( 'a',
-				array( 'href' => $altFormURL ),
-				str_replace( '_', ' ', $alt_form )
-			);
 		}
 		return $text;
 	}
 
-	function printForm( $form_name, $targetName, $alt_forms = array() ) {
+	function printForm( $form_name, $targetName, $alt_forms = [] ) {
+		global $wgPageFormsTargetName;
+
+		// For use by the VEForAll extension.
+		if ( $targetName != '' ) {
+			$wgPageFormsTargetName = $targetName;
+		} else {
+			// Needed for "one-step process" - VE/VEForAll
+			// require the presence of a page name.
+			$wgPageFormsTargetName = 'Dummy title';
+		}
+
 		$out = $this->getOutput();
 		$req = $this->getRequest();
 
@@ -72,13 +89,8 @@ class PFFormEdit extends UnlistedSpecialPage {
 
 		if ( $req->getCheck( 'wpSave' ) || $req->getCheck( 'wpPreview' ) || $req->getCheck( 'wpDiff' ) ) {
 			// If the page was submitted, form data should be
-			// complete => do not preload (unless it's a partial
-			// form).
-			if ( $req->getCheck( 'partial' ) ) {
-				$module->setOption( 'preload', true );
-			} else {
-				$module->setOption( 'preload', false );
-			}
+			// complete => do not preload
+			$module->setOption( 'preload', false );
 		} elseif ( !empty( $targetName ) && Title::newFromText( $targetName )->exists() ) {
 			// If target page exists, do not overwrite it with
 			// preload data; just preload the page's data.
@@ -101,11 +113,11 @@ class PFFormEdit extends UnlistedSpecialPage {
 			}
 		} else {
 			if ( defined( 'ApiResult::META_CONTENT' ) ) {
-				$resultData = $module->getResult()->getResultData( null, array(
-					'BC' => array(),
-					'Types' => array(),
+				$resultData = $module->getResult()->getResultData( null, [
+					'BC' => [],
+					'Types' => [],
 					'Strip' => 'all',
-				) );
+				] );
 			} else {
 				$resultData = $module->getResultData();
 			}
@@ -114,7 +126,7 @@ class PFFormEdit extends UnlistedSpecialPage {
 				foreach ( $resultData['errors'] as $error ) {
 					// FIXME: This should probably not be hard-coded to WARNING but put into a setting
 					if ( $error[ 'level' ] <= PFAutoeditAPI::WARNING ) {
-						$text .= Html::rawElement( 'p', array( 'class' => 'error' ), $error[ 'message' ] ) . "\n";
+						$text .= Html::rawElement( 'p', [ 'class' => 'error' ], $error[ 'message' ] ) . "\n";
 					}
 				}
 			}
@@ -139,11 +151,11 @@ class PFFormEdit extends UnlistedSpecialPage {
 			}
 		} elseif ( $result[ 'form' ] !== '' ) {
 			if ( empty( $targetName ) ) {
-				$pageTitle = wfMessage( 'pf_formedit_createtitlenotarget', $result[ 'form' ] )->text();
+				$pageTitle = $this->msg( 'pf_formedit_createtitlenotarget', $result[ 'form' ] )->text();
 			} elseif ( $targetTitle->exists() ) {
-				$pageTitle = wfMessage( 'pf_formedit_edittitle', $result[ 'form' ], $targetName )->text();
+				$pageTitle = $this->msg( 'pf_formedit_edittitle', $result[ 'form' ], $targetName )->text();
 			} else {
-				$pageTitle = wfMessage( 'pf_formedit_createtitle', $result[ 'form' ], $targetName )->text();
+				$pageTitle = $this->msg( 'pf_formedit_createtitle', $result[ 'form' ], $targetName )->text();
 			}
 		} elseif ( $alt_forms ) {
 			// We use the 'creating' message here, instead of
@@ -152,21 +164,21 @@ class PFFormEdit extends UnlistedSpecialPage {
 			// no target; in English they'll show up as
 			// "Creating ..." and "Create ...", respectively.
 			// Does this make any difference? Who knows.
-			$pageTitle = wfMessage( 'creating', $targetName )->text();
+			$pageTitle = $this->msg( 'creating', $targetName )->text();
 		} elseif ( $result[ 'form' ] == '' ) { // FIXME: This looks weird; a simple else should be enough, right?
-			// display error message if the form is not specified in the URL
-			$pageTitle = wfMessage( 'formedit' )->text();
-			$text .= Html::element( 'p', array( 'class' => 'error' ), wfMessage( 'pf_formedit_badurl' )->text() ) . "\n";
+			// Display error message if the form is not specified in the URL.
+			$text .= Html::element( 'p', [ 'class' => 'error' ], $this->msg( 'pf_formedit_badurl' )->text() ) . "\n";
 			$out->addHTML( $text );
+			return;
 		}
 
 		$out->setPageTitle( $pageTitle );
 		if ( $alt_forms ) {
 			$text .= '<div class="infoMessage">';
 			if ( $result[ 'form' ] != '' ) {
-				$text .= wfMessage( 'pf_formedit_altforms' )->escaped();
+				$text .= $this->msg( 'pf_formedit_altforms' )->escaped();
 			} else {
-				$text .= wfMessage( 'pf_formedit_altformsonly' )->escaped();
+				$text .= $this->msg( 'pf_formedit_altformsonly' )->escaped();
 			}
 			$text .= ' ' . $this->printAltFormsList( $alt_forms, $targetName );
 			$text .= "</div>\n";
@@ -174,15 +186,37 @@ class PFFormEdit extends UnlistedSpecialPage {
 
 		$text .= '<form name="createbox" id="pfForm" method="post" class="createbox">';
 		$pre_form_html = '';
-		Hooks::run( 'PageForms::HTMLBeforeForm', array( &$targetTitle, &$pre_form_html ) );
+		Hooks::run( 'PageForms::HTMLBeforeForm', [ &$targetTitle, &$pre_form_html ] );
 		$text .= $pre_form_html;
-		if ( isset( $result[ 'formHTML' ] ) ) {
-			$text .= $result[ 'formHTML' ];
-		}
 
 		$out->addHTML( $text );
+		$this->showCaptcha( $targetTitle ); // Should be before the closing </form> tag from $result
+
+		if ( isset( $result[ 'formHTML' ] ) ) {
+			$out->addHTML( $result[ 'formHTML' ] );
+		}
 
 		return null;
+	}
+
+	/**
+	 * Show captcha from Extension:ConfirmEdit, if any.
+	 * @param Title $targetTitle
+	 */
+	protected function showCaptcha( $targetTitle ) {
+		if ( !method_exists( 'ConfirmEditHooks', 'getInstance' ) ) {
+			return; // No Extension:ConfirmEdit
+		}
+
+		if ( !$targetTitle ) {
+			return; // Not an edit form (target page is not yet selected)
+		}
+
+		$article = new Article( $targetTitle );
+		$fakeEditPage = new EditPage( $article );
+
+		$captcha = ConfirmEditHooks::getInstance();
+		$captcha->editShowCaptcha( $fakeEditPage );
 	}
 
 	protected function getGroupName() {

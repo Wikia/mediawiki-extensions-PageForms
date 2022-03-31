@@ -8,22 +8,23 @@
  * @ingroup PFFormInput
  */
 class PFCheckboxInput extends PFFormInput {
-	public static function getName() {
+
+	public static function getName(): string {
 		return 'checkbox';
 	}
 
 	public static function getDefaultPropTypes() {
-		return array( '_boo' => array() );
+		return [ '_boo' => [] ];
 	}
 
 	public static function getDefaultCargoTypes() {
-		return array( 'Boolean' => array() );
+		return [ 'Boolean' => [] ];
 	}
 
 	public static function getHTML( $cur_value, $input_name, $is_mandatory, $is_disabled, array $other_args ) {
 		global $wgPageFormsTabIndex, $wgPageFormsFieldNum, $wgPageFormsShowOnSelect;
 
-		$className = ( $is_mandatory ) ? 'mandatoryField' : 'createboxInput';
+		$className = '';
 		if ( array_key_exists( 'class', $other_args ) ) {
 			$className .= ' ' . $other_args['class'];
 		}
@@ -36,7 +37,7 @@ class PFCheckboxInput extends PFFormInput {
 				if ( array_key_exists( $inputID, $wgPageFormsShowOnSelect ) ) {
 					$wgPageFormsShowOnSelect[$inputID][] = $div_id;
 				} else {
-					$wgPageFormsShowOnSelect[$inputID] = array( $div_id );
+					$wgPageFormsShowOnSelect[$inputID] = [ $div_id ];
 				}
 			}
 		}
@@ -50,11 +51,11 @@ class PFCheckboxInput extends PFFormInput {
 			// a 'false' word.
 			$lowercaseCurValue = strtolower( trim( $cur_value ) );
 
-			$possibleYesMessages = array(
+			$possibleYesMessages = [
 				strtolower( wfMessage( 'htmlform-yes' )->inContentLanguage()->text() ),
 				// Add in '1', and some hardcoded English.
 				'1', 'yes', 'true'
-			);
+			];
 
 			// Add values from Semantic MediaWiki, if it's installed.
 			if ( wfMessage( 'smw_true_words' )->exists() ) {
@@ -66,21 +67,23 @@ class PFCheckboxInput extends PFFormInput {
 			$isChecked = in_array( $lowercaseCurValue, $possibleYesMessages );
 		}
 		$text = "\t" . Html::hidden( $input_name . '[is_checkbox]', 'true' ) . "\n";
-		$checkboxAttrs = array(
+		$checkboxAttrs = [
+			'selected' => $isChecked,
 			'id' => $inputID,
-			'class' => $className,
-			'tabindex' => $wgPageFormsTabIndex
-		);
+			'classes' => [ $className ],
+			'tabIndex' => $wgPageFormsTabIndex,
+			'name' => "{$input_name}[value]"
+		];
 		if ( $is_disabled ) {
 			$checkboxAttrs['disabled'] = true;
 		}
-		if ( method_exists( 'Html', 'check' ) ) {
-			// MW 1.24+
-			$text .= "\t" . Html::check( "{$input_name}[value]",
-				$isChecked, $checkboxAttrs );
-		} else {
-			$text .= "\t" . Xml::check( "{$input_name}[value]",
-				$isChecked, $checkboxAttrs );
+		$text .= "\t" . new OOUI\CheckboxInputWidget( $checkboxAttrs ) . "\t" . "<t>";
+		if ( isset( $other_args['label'] ) ) {
+			$text = Html::rawElement(
+				'label',
+				[ 'for' => $inputID ],
+				$text . $other_args['label']
+			);
 		}
 		return $text;
 	}
@@ -88,7 +91,7 @@ class PFCheckboxInput extends PFFormInput {
 	public static function getParameters() {
 		// Remove the 'mandatory' option - it doesn't make sense for
 		// checkboxes.
-		$params = array();
+		$params = [];
 		foreach ( parent::getParameters() as $param ) {
 			if ( $param['name'] != 'mandatory' ) {
 				$params[] = $param;
@@ -101,7 +104,7 @@ class PFCheckboxInput extends PFFormInput {
 	 * Returns the HTML code to be included in the output page for this input.
 	 * @return string
 	 */
-	public function getHtmlText() {
+	public function getHtmlText(): string {
 		return self::getHTML(
 			$this->mCurrentValue,
 			$this->mInputName,

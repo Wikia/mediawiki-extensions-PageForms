@@ -7,37 +7,13 @@
 /**
  * @ingroup PFFormInput
  */
-class PFTextAreaWithAutocompleteInput extends PFTextAreaInput {
-	public static function getName() {
+class PFTextAreaWithAutocompleteInput extends PFTextWithAutocompleteInput {
+
+	public static function getName(): string {
 		return 'textarea with autocomplete';
 	}
 
-	public static function getDefaultPropTypes() {
-		return array();
-	}
-
-	public static function getDefaultCargoTypes() {
-		return array();
-	}
-
-	public static function getParameters() {
-		$params = parent::getParameters();
-		$params = array_merge( $params, PFTextWithAutocompleteInput::getAutocompletionParameters() );
-		return $params;
-	}
-
-	protected function getTextAreaAttributes() {
-		$textarea_attrs = parent::getTextAreaAttributes();
-
-		$is_list = ( array_key_exists( 'is_list', $this->mOtherArgs ) && $this->mOtherArgs['is_list'] == true );
-		list( $autocompleteSettings, $remoteDataType, $delimiter ) = PFValuesUtils::setAutocompleteValues( $this->mOtherArgs, $is_list );
-
-		if ( !is_null( $remoteDataType ) ) {
-			$textarea_attrs['autocompletedatatype'] = $remoteDataType;
-		}
-		$textarea_attrs['autocompletesettings'] = $autocompleteSettings;
-		$textarea_attrs['class'] .= ' autocompleteInput';
-
-		return $textarea_attrs;
+	public static function getHTML( $cur_value, $input_name, $is_mandatory, $is_disabled, array $other_args ) {
+		return call_user_func( self::getAlias() . "::getHTML", $cur_value, $input_name, $is_mandatory, $is_disabled, $other_args );
 	}
 }

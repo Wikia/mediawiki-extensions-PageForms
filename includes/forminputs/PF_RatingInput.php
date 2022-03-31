@@ -8,38 +8,39 @@
  * @ingroup PFFormInput
  */
 class PFRatingInput extends PFFormInput {
-	public static function getName() {
+
+	public static function getName(): string {
 		return 'rating';
 	}
 
 	public static function getOtherPropTypesHandled() {
-		return array( '_num' );
+		return [ '_num' ];
 	}
 
 	public static function getDefaultCargoTypes() {
-		return array(
-			'Rating' => array()
-		);
+		return [
+			'Rating' => []
+		];
 	}
 
 	public static function getParameters() {
 		$params = parent::getParameters();
 
-		$params['star width'] = array(
+		$params['star width'] = [
 			'name' => 'star width',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_starwidth' )->text()
-		);
-		$params['num stars'] = array(
+		];
+		$params['num stars'] = [
 			'name' => 'num stars',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_numstars' )->text()
-		);
-		$params['allow half stars'] = array(
+		];
+		$params['allow half stars'] = [
 			'name' => 'allow half stars',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_allowhalfstars' )->text()
-		);
+		];
 
 		return $params;
 	}
@@ -48,7 +49,7 @@ class PFRatingInput extends PFFormInput {
 	 * Returns the HTML code to be included in the output page for this input.
 	 * @return string
 	 */
-	public function getHtmlText() {
+	public function getHtmlText(): string {
 		global $wgPageFormsFieldNum;
 
 		$className = 'pfRating';
@@ -59,14 +60,14 @@ class PFRatingInput extends PFFormInput {
 			$className .= ' ' . $this->mOtherArgs['class'];
 		}
 		$input_id = "input_$wgPageFormsFieldNum";
-		$ratingAttrs = array(
+		$ratingAttrs = [
 			'class' => $className,
 			// Not useful, since the rating can't be modified
 			// via the keyboard.
 			// 'tabindex' => $wgPageFormsTabIndex,
 			'data-curvalue' => $this->mCurrentValue
 
-		);
+		];
 		if ( $this->mIsDisabled ) {
 			$ratingAttrs['disabled'] = 'disabled';
 		}
@@ -86,9 +87,9 @@ class PFRatingInput extends PFFormInput {
 		if ( array_key_exists( 'allow half stars', $this->mOtherArgs ) ) {
 			$ratingAttrs['data-allows-half'] = true;
 		}
-		$hiddenInputAttrs = array(
+		$hiddenInputAttrs = [
 			'id' => $input_id
-		);
+		];
 
 		$hiddenInput = Html::hidden(
 			$this->mInputName,
@@ -99,7 +100,7 @@ class PFRatingInput extends PFFormInput {
 		$text = Html::element( 'div', $ratingAttrs ) . ' ' . $hiddenInput;
 		// For some reason this wrapper has to be a div, not a span,
 		// or else the HTML gets messed up.
-		$text = Html::rawElement( 'div', array( 'class' => 'pfRatingWrapper' ), $text );
+		$text = Html::rawElement( 'div', [ 'class' => 'pfRatingWrapper' ], $text );
 
 		return $text;
 	}

@@ -2,12 +2,12 @@
 	"@metadata": {
 		"authors": [
 			"Domas",
-			"Pofka",
-			"Hugo.arg",
-			"Zygimantus",
-			"Homo",
 			"Eitvys200",
-			"Manvydasz"
+			"Homo",
+			"Hugo.arg",
+			"Manvydasz",
+			"Pofka",
+			"Zygimantus"
 		]
 	},
 	"createproperty": "Sukurti savybę",
@@ -140,6 +140,7 @@
 	"pf_bad_url_error": "turi būti taisyklinga nuoroda (URL), prasidedanti „http“",
 	"pf_bad_email_error": "turi būti taisyklingas el. pašto adresas",
 	"pf_bad_number_error": "turi būti skaičius",
+	"pf_bad_integer_error": "turi būti teigiamas skaičius",
 	"pf_bad_date_error": "turi būti taisyklinga data",
 	"uploadwindow": "Failo įkėlimo langas",
 	"pf_deletionlog": "Trynimų žurnalas",
@@ -156,7 +157,7 @@
 	"pf_category_hasdefaultform": "Ši kategorija naudoja „$1“ formą.",
 	"pf_category_desc": "Tai yra „$1“ kategorija.",
 	"pf_blank_namespace": "Pagrindinis",
-	"pf-select2-selection-too-big": "Šiame laukelyje negali būti daugiau nei {{PLURAL:$1|$1 reikšmės|$1 reikšmių}}.",
+	"pf-autocomplete-selection-too-big": "Šiame laukelyje negali būti daugiau nei {{PLURAL:$1|$1 reikšmės|$1 reikšmių}}.",
 	"pf-maps-enteraddress": "Įveskite adresą čia",
 	"pf-maps-lookupcoordinates": "Ieškoti koordinačių pagal adresą",
 	"pf-adminlinks-datastructure": "Duomenų struktūra",

@@ -1,11 +1,8 @@
 <?php
 /**
  * Defines a class, PFTemplate, that represents a MediaWiki "infobox"
- * template that holds structured data, which may or may not include
- * SMW properties.
- *
- * For now, this class is used only to generate the text of a template,
- * by various helper pages.
+ * template that holds structured data, which may or may not be
+ * additionally stored by Cargo and/or Semantic MediaWiki.
  *
  * @author Yaron Koren
  * @file
@@ -16,9 +13,10 @@ class PFTemplate {
 	private $mTemplateName;
 	private $mTemplateText;
 	private $mTemplateFields;
+	private $mTemplateParams;
 	private $mConnectingProperty;
 	private $mCategoryName;
-	public $mCargoTable;
+	private $mCargoTable;
 	private $mAggregatingProperty;
 	private $mAggregationLabel;
 	private $mTemplateFormat;
@@ -33,13 +31,37 @@ class PFTemplate {
 	}
 
 	public static function newFromName( $templateName ) {
-		$template = new PFTemplate( $templateName, array() );
+		$template = new PFTemplate( $templateName, [] );
+		$template->loadTemplateParams();
 		$template->loadTemplateFields();
 		return $template;
 	}
 
 	/**
-	 * @TODO - fix so that this function only gets called once per
+	 * Get (and store in memory) the values from this template's
+	 * #template_params call, if it exists.
+	 */
+	public function loadTemplateParams() {
+		$embeddedTemplate = null;
+		$templateTitle = Title::makeTitleSafe( NS_TEMPLATE, $this->mTemplateName );
+		$properties = PageProps::getInstance()->getProperties(
+			[ $templateTitle ], [ 'PageFormsTemplateParams' ]
+		);
+		if ( count( $properties ) == 0 ) {
+			return;
+		}
+
+		$paramsForPage = reset( $properties );
+		$paramsForProperty = reset( $paramsForPage );
+		$this->mTemplateParams = unserialize( $paramsForProperty );
+	}
+
+	public function getTemplateParams() {
+		return $this->mTemplateParams;
+	}
+
+	/**
+	 * @todo - fix so that this function only gets called once per
 	 * template; right now it seems to get called once per field. (!)
 	 */
 	function loadTemplateFields() {
@@ -51,7 +73,7 @@ class PFTemplate {
 		$templateText = PFUtils::getPageText( $templateTitle );
 		// Ignore 'noinclude' sections and 'includeonly' tags.
 		$templateText = StringUtils::delimiterReplace( '<noinclude>', '</noinclude>', '', $templateText );
-		$this->mTemplateText = strtr( $templateText, array( '<includeonly>' => '', '</includeonly>' => '' ) );
+		$this->mTemplateText = strtr( $templateText, [ '<includeonly>' => '', '</includeonly>' => '' ] );
 
 		// The Cargo-based function is more specific; it only gets
 		// data structure information from the template schema. If
@@ -72,9 +94,8 @@ class PFTemplate {
 	 * attached to each one (if any), by parsing the text of the template.
 	 */
 	function loadTemplateFieldsSMWAndOther() {
-		global $wgContLang;
-		$templateFields = array();
-		$fieldNamesArray = array();
+		$templateFields = [];
+		$fieldNamesArray = [];
 
 		// The way this works is that fields are found and then stored
 		// in an array based on their location in the template text, so
@@ -97,7 +118,7 @@ class PFTemplate {
 		// property onto a list.
 		if ( $ret = preg_match_all( '/{{#arraymap:{{{([^|}]*:?[^|}]*)[^\[]*\[\[([^:]*:?[^:]*)::/mis', $this->mTemplateText, $matches ) ) {
 			foreach ( $matches[1] as $i => $field_name ) {
-				if ( ! in_array( $field_name, $fieldNamesArray ) ) {
+				if ( !in_array( $field_name, $fieldNamesArray ) ) {
 					$propertyName = $matches[2][$i];
 					$this->loadPropertySettingInTemplate( $field_name, $propertyName, true );
 					$fieldNamesArray[] = $field_name;
@@ -115,7 +136,7 @@ class PFTemplate {
 		if ( preg_match_all( '/\[\[([^:|\[\]]*:*?[^:|\[\]]*)::{{{([^\]\|}]*).*?\]\]/mis', $this->mTemplateText, $matches ) ) {
 			foreach ( $matches[1] as $i => $propertyName ) {
 				$field_name = trim( $matches[2][$i] );
-				if ( ! in_array( $field_name, $fieldNamesArray ) ) {
+				if ( !in_array( $field_name, $fieldNamesArray ) ) {
 					$propertyName = trim( $propertyName );
 					$this->loadPropertySettingInTemplate( $field_name, $propertyName, false );
 					$fieldNamesArray[] = $field_name;
@@ -130,7 +151,7 @@ class PFTemplate {
 				if ( preg_match_all( '/([^|{]*?)=\s*{{{([^|}]*)/mis', $match, $matches2 ) ) {
 					foreach ( $matches2[1] as $i => $propertyName ) {
 						$fieldName = trim( $matches2[2][$i] );
-						if ( ! in_array( $fieldName, $fieldNamesArray ) ) {
+						if ( !in_array( $fieldName, $fieldNamesArray ) ) {
 							$propertyName = trim( $propertyName );
 							$this->loadPropertySettingInTemplate( $fieldName, $propertyName, false );
 							$fieldNamesArray[] = $fieldName;
@@ -150,7 +171,7 @@ class PFTemplate {
 					if ( count( $keyAndVal ) == 2 ) {
 						$propertyName = trim( $keyAndVal[0] );
 						$fieldName = trim( $keyAndVal[1] );
-						if ( ! in_array( $fieldName, $fieldNamesArray ) ) {
+						if ( !in_array( $fieldName, $fieldNamesArray ) ) {
 							$this->loadPropertySettingInTemplate( $fieldName, $propertyName, false );
 							$fieldNamesArray[] = $fieldName;
 						}
@@ -163,9 +184,9 @@ class PFTemplate {
 		if ( preg_match_all( '/{{{([^|}]*)/mis', $this->mTemplateText, $matches ) ) {
 			foreach ( $matches[1] as $fieldName ) {
 				$fieldName = trim( $fieldName );
-				if ( !empty( $fieldName ) && ( ! in_array( $fieldName, $fieldNamesArray ) ) ) {
+				if ( !empty( $fieldName ) && ( !in_array( $fieldName, $fieldNamesArray ) ) ) {
 					$cur_pos = stripos( $this->mTemplateText, $fieldName );
-					$this->mTemplateFields[$cur_pos] = PFTemplateField::create( $fieldName, $wgContLang->ucfirst( $fieldName ) );
+					$this->mTemplateFields[$cur_pos] = PFTemplateField::create( $fieldName, PFUtils::getContLang()->ucfirst( $fieldName ) );
 					$fieldNamesArray[] = $fieldName;
 				}
 			}
@@ -182,43 +203,52 @@ class PFTemplate {
 	 * @param bool $isList
 	 */
 	function loadPropertySettingInTemplate( $fieldName, $propertyName, $isList ) {
-		global $wgContLang;
-		$templateField = PFTemplateField::create( $fieldName, $wgContLang->ucfirst( $fieldName ), $propertyName, $isList );
+		$templateField = PFTemplateField::create(
+			$fieldName, PFUtils::getContLang()->ucfirst( $fieldName ), $propertyName,
+			$isList
+		);
 		$cur_pos = stripos( $this->mTemplateText, $fieldName . '|' );
 		$this->mTemplateFields[$cur_pos] = $templateField;
 	}
 
 	function loadTemplateFieldsCargo( $templateTitle ) {
-		$cargoFieldsOfTemplateParams = array();
+		$cargoFieldsOfTemplateParams = [];
 
 		// First, get the table name, and fields, declared for this
-		// template.
-		$templatePageID = $templateTitle->getArticleID();
-		$tableSchemaString = CargoUtils::getPageProp( $templatePageID, 'CargoFields' );
-		// See if there even is DB storage for this template - if not,
-		// exit.
-		if ( is_null( $tableSchemaString ) ) {
-			// There's no declared table - but see if there's an
-			// attached table.
-			list( $tableName, $isDeclared ) = CargoUtils::getTableNameForTemplate( $templateTitle );
-			if ( $tableName == null ) {
-				return null;
-			}
-			$mainTemplatePageID = CargoUtils::getTemplateIDForDBTable( $tableName );
-			$tableSchemaString = CargoUtils::getPageProp( $mainTemplatePageID, 'CargoFields' );
-		} else {
-			$tableName = CargoUtils::getPageProp( $templatePageID, 'CargoTableName' );
+		// template, if any.
+		list( $tableName, $tableSchema ) = $this->getCargoTableAndSchema( $templateTitle );
+		if ( $tableName == null ) {
+			return;
 		}
-		$tableSchema = CargoTableSchema::newFromDBString( $tableSchemaString );
+		$fieldDescriptions = $tableSchema->mFieldDescriptions;
 
-		// Then, match template params to Cargo table fields, by
-		// parsing call(s) to #cargo_store.
+		// If #template_params was declared for this template, our
+		// job is easy - we just go through the declared fields, get
+		// the Cargo data for each field if it exists, and populate
+		// $mTemplateFields with it.
+		if ( $this->mTemplateParams !== null ) {
+			foreach ( $this->mTemplateParams as $fieldName => $fieldParams ) {
+				$templateField = PFTemplateField::newFromParams( $fieldName, $fieldParams );
+				$cargoField = $templateField->getExpectedCargoField();
+				if ( array_key_exists( $cargoField, $fieldDescriptions ) ) {
+					$fieldDescription = $fieldDescriptions[$cargoField];
+					$templateField->setCargoFieldData( $tableName, $cargoField, $fieldDescription );
+				}
+				$this->mTemplateFields[$fieldName] = $templateField;
+			}
+			return;
+		}
+
+		// No #template_params call, so we have to do a more manual
+		// process.
+		// Match template params to Cargo table fields, by parsing
+		// call(s) to #cargo_store.
 		// Let's find every #cargo_store tag.
 		// Unfortunately, it doesn't seem possible to use a regexp
 		// search for this, because it's hard to know which set of
 		// double brackets represents the end of such a call. Instead,
 		// we'll do some manual parsing.
-		$cargoStoreLocations = array();
+		$cargoStoreLocations = [];
 		$curPos = 0;
 		while ( true ) {
 			$newPos = strpos( $this->mTemplateText, "#cargo_store:", $curPos );
@@ -229,7 +259,7 @@ class PFTemplate {
 			$cargoStoreLocations[] = $curPos;
 		}
 
-		$cargoStoreCalls = array();
+		$cargoStoreCalls = [];
 		foreach ( $cargoStoreLocations as $locNum => $startPos ) {
 			$numUnclosedBrackets = 2;
 			if ( $locNum < count( $cargoStoreLocations ) - 1 ) {
@@ -266,7 +296,9 @@ class PFTemplate {
 
 		// Now, combine the two sets of information into an array of
 		// PFTemplateFields objects.
-		$fieldDescriptions = $tableSchema->mFieldDescriptions;
+		// First, go through the #cargo_store parameters, add add them
+		// all to the array, matching them with Cargo field descriptions
+		// where possible.
 		foreach ( $cargoFieldsOfTemplateParams as $templateParameter => $cargoField ) {
 			$templateField = PFTemplateField::create( $templateParameter, $templateParameter );
 			if ( array_key_exists( $cargoField, $fieldDescriptions ) ) {
@@ -275,6 +307,42 @@ class PFTemplate {
 			}
 			$this->mTemplateFields[] = $templateField;
 		}
+
+		// Now, go through the Cargo field descriptions, and add
+		// whichever ones were not in #cargo_store (as of version 3.0,
+		// Cargo does not require template parameters to be passed in
+		// to #cargo_store).
+		foreach ( $fieldDescriptions as $cargoField => $fieldDescription ) {
+			$templateParameter = array_search( $cargoField, $cargoFieldsOfTemplateParams );
+			if ( $templateParameter !== false ) {
+				continue;
+			}
+			$templateParameter = str_replace( '_', ' ', $cargoField );
+			$templateField = PFTemplateField::create( $templateParameter, $templateParameter );
+			$templateField->setCargoFieldData( $tableName, $cargoField, $fieldDescription );
+			$this->mTemplateFields[] = $templateField;
+		}
+	}
+
+	function getCargoTableAndSchema( $templateTitle ) {
+		$templatePageID = $templateTitle->getArticleID();
+		$tableSchemaString = CargoUtils::getPageProp( $templatePageID, 'CargoFields' );
+		// See if there even is DB storage for this template - if not,
+		// exit.
+		if ( $tableSchemaString === null ) {
+			// There's no declared table - but see if there's an
+			// attached table.
+			list( $tableName, $isDeclared ) = CargoUtils::getTableNameForTemplate( $templateTitle );
+			if ( $tableName == null ) {
+				return [ null, null ];
+			}
+			$mainTemplatePageID = CargoUtils::getTemplateIDForDBTable( $tableName );
+			$tableSchemaString = CargoUtils::getPageProp( $mainTemplatePageID, 'CargoFields' );
+		} else {
+			$tableName = CargoUtils::getPageProp( $templatePageID, 'CargoTableName' );
+		}
+		$tableSchema = CargoTableSchema::newFromDBString( $tableSchemaString );
+		return [ $tableName, $tableSchema ];
 	}
 
 	public function getTemplateFields() {
@@ -296,6 +364,10 @@ class PFTemplate {
 
 	public function setCategoryName( $categoryName ) {
 		$this->mCategoryName = $categoryName;
+	}
+
+	public function setCargoTable( $cargoTable ) {
+		$this->mCargoTable = str_replace( ' ', '_', $cargoTable );
 	}
 
 	public function setAggregatingInfo( $aggregatingProperty, $aggregationLabel ) {
@@ -352,6 +424,12 @@ class PFTemplate {
 	public function createCargoStoreCall() {
 		$text = '{{#cargo_store:';
 		$text .= '_table=' . $this->mCargoTable;
+		if ( defined( 'CargoStore::PARAMS_OPTIONAL' ) ) {
+			// Cargo 3.0+
+			$text .= '}}';
+			return $text;
+		}
+
 		foreach ( $this->mTemplateFields as $i => $field ) {
 			$text .= '|' .
 				str_replace( ' ', '_', $field->getFieldName() ) .
@@ -370,23 +448,19 @@ class PFTemplate {
 	public function createText() {
 		// Avoid PHP 7.1 warning from passing $this by reference
 		$template = $this;
-		Hooks::run( 'PageForms::CreateTemplateText', array( &$template ) );
-		$templateHeader = wfMessage( 'pf_template_docu', $this->mTemplateName )->inContentLanguage()->text();
+		Hooks::run( 'PageForms::CreateTemplateText', [ &$template ] );
 		$text = <<<END
 <noinclude>
-$templateHeader
-<pre>
-
+{{#template_params:
 END;
-		$text .= '{{' . $this->mTemplateName;
-		if ( count( $this->mTemplateFields ) > 0 ) {
-			$text .= "\n";
-		}
-		foreach ( $this->mTemplateFields as $field ) {
+		foreach ( $this->mTemplateFields as $i => $field ) {
 			if ( $field->getFieldName() == '' ) {
 				continue;
 			}
-			$text .= "|" . $field->getFieldName() . "=\n";
+			if ( $i > 0 ) {
+				$text .= "|";
+			}
+			$text .= $field->toWikitext();
 		}
 		if ( defined( 'CARGO_VERSION' ) && !defined( 'SMW_VERSION' ) && $this->mCargoTable != '' ) {
 			$cargoInUse = true;
@@ -398,13 +472,21 @@ END;
 			$cargoStoreCall = '';
 		}
 
-		$templateFooter = wfMessage( 'pf_template_docufooter' )->inContentLanguage()->text();
 		$text .= <<<END
 }}
-</pre>
-$templateFooter
 $cargoDeclareCall</noinclude><includeonly>$cargoStoreCall
 END;
+
+		if ( !defined( 'SMW_VERSION' ) ) {
+			$text .= "\n{{#template_display:";
+			if ( $this->mTemplateFormat != null ) {
+				$text .= "_format=" . $this->mTemplateFormat;
+			}
+			$text .= "}}";
+			$text .= $this->printCategoryTag();
+			$text .= "</includeonly>";
+			return $text;
+		}
 
 		// Before text
 		$text .= $this->mTemplateStart;
@@ -454,7 +536,7 @@ END;
 			}
 
 			$fieldParam = '{{{' . $field->getFieldName() . '|}}}';
-			if ( is_null( $field->getNamespace() ) ) {
+			if ( $field->getNamespace() === null ) {
 				$fieldString = $fieldParam;
 			} else {
 				$fieldString = $field->getNamespace() . ':' . $fieldParam;
@@ -470,7 +552,7 @@ END;
 			$fieldIsList = $field->isList();
 
 			// Header/field label column
-			if ( is_null( $fieldDisplay ) ) {
+			if ( $fieldDisplay === null ) {
 				if ( $this->mTemplateFormat == 'standard' || $this->mTemplateFormat == 'infobox' ) {
 					if ( $i > 0 ) {
 						$tableText .= "|-\n";
@@ -512,7 +594,7 @@ END;
 
 			// If we're using Cargo, fields can simply be displayed
 			// normally - no need for any special tags - *unless*
-			// the field holds a list of Page value, in which case
+			// the field holds a list of Page values, in which case
 			// we need to apply #arraymap.
 			$isCargoListOfPages = $cargoInUse && $field->isList() && $field->getFieldType() == 'Page';
 			if ( !$fieldProperty && !$isCargoListOfPages ) {
@@ -524,7 +606,7 @@ END;
 					$tableText .= " }}";
 				}
 				$tableText .= "\n";
-			} elseif ( !is_null( $internalObjText ) ) {
+			} elseif ( $internalObjText !== null ) {
 				if ( $separator != '' ) {
 					$tableText .= "$separator ";
 				}
@@ -552,7 +634,7 @@ END;
 				if ( $this->mTemplateFormat == 'standard' || $this->mTemplateFormat == 'infobox' ) {
 					$tableText .= '{{!}} ';
 				}
-				$tableText .= $this->createTextForField( $field ) . "\n";
+				$tableText .= $this->createTextForField( $field ) . "\n}}\n";
 			} else {
 				$tableText .= $this->createTextForField( $field ) . "\n";
 			}
@@ -560,14 +642,14 @@ END;
 
 		// Add an inline query to the output text, for
 		// aggregation, if a property was specified.
-		if ( !is_null( $this->mAggregatingProperty ) && $this->mAggregatingProperty !== '' ) {
+		if ( $this->mAggregatingProperty !== null && $this->mAggregatingProperty !== '' ) {
 			if ( $this->mTemplateFormat == 'standard' || $this->mTemplateFormat == 'infobox' ) {
 				if ( count( $this->mTemplateFields ) > 0 ) {
 					$tableText .= "|-\n";
 				}
 				$tableText .= <<<END
 ! $this->mAggregationLabel
-| 
+|
 END;
 			} elseif ( $this->mTemplateFormat == 'plain' ) {
 				$tableText .= "\n'''" . $this->mAggregationLabel . ":''' ";
@@ -582,7 +664,7 @@ END;
 		// Leave out newlines if there's an internal property
 		// set here (which would mean that there are meant to be
 		// multiple instances of this template.)
-		if ( is_null( $internalObjText ) ) {
+		if ( $internalObjText === null ) {
 			if ( $this->mTemplateFormat == 'standard' || $this->mTemplateFormat == 'infobox' ) {
 				$tableText .= "\n";
 			}
@@ -598,12 +680,7 @@ END;
 		}
 
 		$text .= $tableText;
-		if ( ( $this->mCategoryName !== '' ) && ( $this->mCategoryName !== null ) ) {
-			global $wgContLang;
-			$namespaceLabels = $wgContLang->getNamespaces();
-			$categoryNamespace = $namespaceLabels[NS_CATEGORY];
-			$text .= "\n[[$categoryNamespace:" . $this->mCategoryName . "]]\n";
-		}
+		$text .= $this->printCategoryTag();
 
 		// After text
 		$text .= $this->mTemplateEnd;
@@ -616,7 +693,7 @@ END;
 	function createTextForField( $field ) {
 		$text = '';
 		$fieldStart = $this->mFieldStart;
-		Hooks::run( 'PageForms::TemplateFieldStart', array( $field, &$fieldStart ) );
+		Hooks::run( 'PageForms::TemplateFieldStart', [ $field, &$fieldStart ] );
 		if ( $fieldStart != '' ) {
 			$text .= "$fieldStart ";
 		}
@@ -625,12 +702,21 @@ END;
 		$text .= $field->createText( $cargoInUse );
 
 		$fieldEnd = $this->mFieldEnd;
-		Hooks::run( 'PageForms::TemplateFieldEnd', array( $field, &$fieldEnd ) );
+		Hooks::run( 'PageForms::TemplateFieldEnd', [ $field, &$fieldEnd ] );
 		if ( $fieldEnd != '' ) {
 			$text .= " $fieldEnd";
 		}
 
 		return $text;
+	}
+
+	function printCategoryTag() {
+		if ( ( $this->mCategoryName === '' || $this->mCategoryName === null ) ) {
+			return '';
+		}
+		$namespaceLabels = PFUtils::getContLang()->getNamespaces();
+		$categoryNamespace = $namespaceLabels[NS_CATEGORY];
+		return "\n[[$categoryNamespace:" . $this->mCategoryName . "]]\n";
 	}
 
 }

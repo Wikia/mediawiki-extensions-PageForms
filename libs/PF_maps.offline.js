@@ -10,12 +10,15 @@ function setupMapFormInput( inputDiv, mapService ) {
 	/**
 	 * Round off a number to five decimal places - that's the most
 	 * we need for coordinates, one would think.
+	 *
+	 * @param {Mixed} num
+	 * @return {Mixed}
 	 */
 	function pfRoundOffDecimal( num ) {
 		return Math.round( num * 100000 ) / 100000;
 	}
 
-	var map, marker, markers, mapCanvas, mapOptions;
+	var map, marker, markers, mapCanvas, mapOptions, geocoder;
 	var numClicks = 0, timer = null;
 
 	var coordsInput = inputDiv.find('.pfCoordsInput');
@@ -92,7 +95,7 @@ function setupMapFormInput( inputDiv, mapService ) {
 			center: new google.maps.LatLng( 0, 0 )
 		};
 		map = new google.maps.Map( mapCanvas, mapOptions );
-		var geocoder = new google.maps.Geocoder();
+		geocoder = new google.maps.Geocoder();
 
 		// Let a click set the marker, while keeping the default
 		// behavior (zoom and center) for double clicks.
@@ -109,7 +112,7 @@ function setupMapFormInput( inputDiv, mapService ) {
 		mapCanvas = inputDiv.find('.pfMapCanvas').get(0);
 		mapOptions = {
 			zoom: 1,
-			center: [0, 0]
+			center: [ 0, 0 ]
 		};
 		var layerOptions = {
 			attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -134,9 +137,31 @@ function setupMapFormInput( inputDiv, mapService ) {
 			}
 		});
 	} else { // if ( mapService == "OpenLayers" ) {
-		var mapCanvasID = inputDiv.find( '.pfMapCanvas' ).attr( 'id' );
+		mapCanvas = inputDiv.find('.pfMapCanvas');
+		var mapCanvasID = mapCanvas.attr('id');
+		if ( mapCanvasID === undefined ) {
+			// If no ID is set, it's probably in a multiple-
+			// instance template; just set the ID to a random
+			// string, so we can attach the map to it.
+			mapCanvasID = mapCanvas.attr('data-origID') + '-' +
+				Math.random().toString(36).substring(2, 15);
+			mapCanvas.attr('ID', mapCanvasID);
+		}
 		map = new OpenLayers.Map( mapCanvasID );
-		map.addLayer( new OpenLayers.Layer.OSM() );
+		// We do this more complex initialization, rather than just
+		// calling OpenLayers.Layer.OSM(), so that the tiles will be
+		// loaded via either HTTP or HTTPS, depending on what we are
+		// using.
+		map.addLayer( new OpenLayers.Layer.OSM(
+			"OpenStreetMap",
+			// Official OSM tileset as protocol-independent URLs
+			[
+				'//a.tile.openstreetmap.org/${z}/${x}/${y}.png',
+				'//b.tile.openstreetmap.org/${z}/${x}/${y}.png',
+				'//c.tile.openstreetmap.org/${z}/${x}/${y}.png'
+			],
+			null
+		) );
 		map.zoomTo( 0 );
 		markers = new OpenLayers.Layer.Markers( "Markers" );
 		map.addLayer( markers );
@@ -156,10 +181,10 @@ function setupMapFormInput( inputDiv, mapService ) {
 		} );
 	}
 
-	function toOpenLayersLonLat( map, lat, lon ) {
+	function toOpenLayersLonLat( maps, lat, lon ) {
 		return new OpenLayers.LonLat( lon, lat ).transform(
 			new OpenLayers.Projection( "EPSG:4326" ), // transform from WGS 1984
-			map.getProjectionObject() // to Spherical Mercator Projection
+			maps.getProjectionObject() // to Spherical Mercator Projection
 		);
 	}
 
@@ -211,28 +236,28 @@ function setupMapFormInput( inputDiv, mapService ) {
 	coordsInput.keydown( function( e ) {
 		if ( ! coordsInput.hasClass( 'modifiedInput' ) ) {
 			coordsInput.addClass( 'modifiedInput' );
-			var checkMark = $('<a></a>').addClass( 'pfCoordsCheckMark' ).css( 'color', 'green' ).html( '&#10004;' );
-			var xMark = $('<a></a>').addClass( 'pfCoordsX' ).css( 'color', 'red' ).html( '&#10008;' );
-			var marksDiv = $('<span></span>').addClass( 'pfCoordsInputHelpers' )
-				.append( checkMark ).append( ' ' ).append( xMark );
-			coordsInput.parent().append( marksDiv );
+			var $checkMark = $('<a></a>').addClass( 'pfCoordsCheckMark' ).css( 'color', 'green' ).html( '&#10004;' );
+			var $xMark = $('<a></a>').addClass( 'pfCoordsX' ).css( 'color', 'red' ).html( '&#10008;' );
+			var $marksDiv = $('<span></span>').addClass( 'pfCoordsInputHelpers' )
+				.append( $checkMark ).append( ' ' ).append( $xMark );
+			coordsInput.parent().append( $marksDiv );
 
-			checkMark.click( function() {
+			$checkMark.click( function() {
 				setMarkerFromCoordinates();
 				coordsInput.removeClass( 'modifiedInput' );
-				marksDiv.remove();
+				$marksDiv.remove();
 			});
 
-			xMark.click( function() {
+			$xMark.click( function() {
 				coordsInput.removeClass( 'modifiedInput' )
 					.val( coordsInput.attr('data-original-value') );
-				marksDiv.remove();
+				$marksDiv.remove();
 			});
 		}
 	});
 
 	function setMarkerFromAddress() {
-		var addressText = inputDiv.find('.pfAddressInput').val(),
+		var addressText = inputDiv.find('.pfAddressInput input').val(),
 			alert;
 		if ( mapService === "Google Maps" ) {
 			map.setZoom(14);
@@ -275,7 +300,7 @@ function setupMapFormInput( inputDiv, mapService ) {
 				} else if ( mapService === "Leaflet" ) {
 					var lPoint = L.latLng( lat, lon );
 					leafletSetMarker( lPoint );
-					map.fitBounds([[bottom, left], [top, right]]);
+					map.fitBounds([ [ bottom, left ], [ top, right ] ]);
 				}
 			});
 		}
@@ -303,12 +328,35 @@ function setupMapFormInput( inputDiv, mapService ) {
 
 jQuery(document).ready( function() {
 	jQuery(".pfGoogleMapsInput").each( function() {
+		// Ignore the hidden "starter" div in multiple-instance templates.
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
 		setupMapFormInput( jQuery(this), "Google Maps" );
 	});
 	jQuery(".pfLeafletInput").each( function() {
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
 		setupMapFormInput( jQuery(this), "Leaflet" );
 	});
 	jQuery(".pfOpenLayersInput").each( function() {
+		if ( $(this).closest(".multipleTemplateStarter").length > 0 ) {
+			return;
+		}
+		setupMapFormInput( jQuery(this), "OpenLayers" );
+	});
+});
+
+// Activate maps in a new instance of a multiple-instance template.
+mw.hook('pf.addTemplateInstance').add(function( $newInstance ) {
+	$newInstance.find(".pfGoogleMapsInput").each( function() {
+		setupMapFormInput( jQuery(this), "Google Maps" );
+	});
+	$newInstance.find(".pfLeafletInput").each( function() {
+		setupMapFormInput( jQuery(this), "Leaflet" );
+	});
+	$newInstance.find(".pfOpenLayersInput").each( function() {
 		setupMapFormInput( jQuery(this), "OpenLayers" );
 	});
 });

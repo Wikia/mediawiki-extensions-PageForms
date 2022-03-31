@@ -12,18 +12,22 @@ class PFTextAreaInput extends PFFormInput {
 
 	protected $mEditor = null;
 
+	public static function getName(): string {
+		return 'textarea';
+	}
+
 	public static function getDefaultCargoTypes() {
-		return array(
-			'Text' => array(),
-			'Searchtext' => array()
-		);
+		return [
+			'Text' => [],
+			'Searchtext' => []
+		];
 	}
 
 	public static function getDefaultCargoTypeLists() {
-		return array(
-			'Text' => array( 'field_type' => 'text', 'is_list' => 'true' ),
-			'Searchtext' => array( 'field_type' => 'text', 'is_list' => 'true' )
-		);
+		return [
+			'Text' => [ 'field_type' => 'text', 'is_list' => 'true' ],
+			'Searchtext' => [ 'field_type' => 'text', 'is_list' => 'true' ]
+		];
 	}
 
 	/**
@@ -41,6 +45,8 @@ class PFTextAreaInput extends PFFormInput {
 		global $wgOut;
 
 		parent::__construct( $input_number, $cur_value, $input_name, $disabled, $other_args );
+
+		$newClasses = null;
 
 		// WikiEditor
 		if (
@@ -60,6 +66,9 @@ class PFTextAreaInput extends PFFormInput {
 			ExtensionRegistry::getInstance()->isLoaded( 'VisualEditor' )
 		) {
 			$this->mEditor = 'visualeditor';
+			if ( $input_name != 'pf_free_text' && !array_key_exists( 'isSection', $this->mOtherArgs ) ) {
+				$newClasses = 'vePartOfTemplate';
+			}
 		}
 
 		// TinyMCE
@@ -74,29 +83,28 @@ class PFTextAreaInput extends PFFormInput {
 			if ( $input_name != 'pf_free_text' && !array_key_exists( 'isSection', $this->mOtherArgs ) ) {
 				$newClasses .= ' mcePartOfTemplate';
 			}
-			if ( array_key_exists( 'class', $this->mOtherArgs ) ) {
-				$this->mOtherArgs['class'] .= ' ' . $newClasses;
-			} else {
-				$this->mOtherArgs['class'] = $newClasses;
-			}
+		}
+
+		if ( $newClasses == null ) {
+			// Do nothing.
+		} elseif ( array_key_exists( 'class', $this->mOtherArgs ) ) {
+			$this->mOtherArgs['class'] .= ' ' . $newClasses;
+		} else {
+			$this->mOtherArgs['class'] = $newClasses;
 		}
 	}
 
-	public static function getName() {
-		return 'textarea';
-	}
-
 	public static function getDefaultPropTypes() {
-		$defaultPropTypes = array( '_cod' => array() );
+		$defaultPropTypes = [ '_cod' => [] ];
 		if ( defined( 'SMWDataItem::TYPE_STRING' ) ) {
 			// SMW < 1.9
-			$defaultPropTypes['_txt'] = array();
+			$defaultPropTypes['_txt'] = [];
 		}
 		return $defaultPropTypes;
 	}
 
 	public static function getOtherPropTypesHandled() {
-		$otherPropTypesHandled = array( '_wpg' );
+		$otherPropTypesHandled = [ '_wpg' ];
 		if ( defined( 'SMWDataItem::TYPE_STRING' ) ) {
 			// SMW < 1.9
 			$otherPropTypesHandled[] = '_str';
@@ -107,7 +115,7 @@ class PFTextAreaInput extends PFFormInput {
 	}
 
 	public static function getOtherPropTypeListsHandled() {
-		$otherPropTypeListsHandled = array( '_wpg' );
+		$otherPropTypeListsHandled = [ '_wpg' ];
 		if ( defined( 'SMWDataItem::TYPE_STRING' ) ) {
 			// SMW < 1.9
 			$otherPropTypeListsHandled[] = '_str';
@@ -120,36 +128,36 @@ class PFTextAreaInput extends PFFormInput {
 	public static function getParameters() {
 		$params = parent::getParameters();
 
-		$params['preload'] = array(
+		$params['preload'] = [
 			'name' => 'preload',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_preload' )->text()
-		);
-		$params['rows'] = array(
+		];
+		$params['rows'] = [
 			'name' => 'rows',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_rows' )->text()
-		);
-		$params['cols'] = array(
+		];
+		$params['cols'] = [
 			'name' => 'cols',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_cols' )->text()
-		);
-		$params['maxlength'] = array(
+		];
+		$params['maxlength'] = [
 			'name' => 'maxlength',
 			'type' => 'int',
 			'description' => wfMessage( 'pf_forminputs_maxlength' )->text()
-		);
-		$params['placeholder'] = array(
+		];
+		$params['placeholder'] = [
 			'name' => 'placeholder',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_placeholder' )->text()
-		);
-		$params['autogrow'] = array(
+		];
+		$params['autogrow'] = [
 			'name' => 'autogrow',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_autogrow' )->text()
-		);
+		];
 		return $params;
 	}
 
@@ -182,15 +190,12 @@ class PFTextAreaInput extends PFFormInput {
 		$input_id = $this->mInputName == 'pf_free_text' ? 'pf_free_text' : "input_$wgPageFormsFieldNum";
 
 		if ( $this->mEditor == 'wikieditor' ) {
-			// Load modules for all enabled WikiEditor features.
-			// The header for this function was changed in July
-			// 2014, and the function itself was changed
-			// significantly in March 2015 - this call should
-			// hopefully work for all versions.
 			global $wgTitle, $wgOut;
-			$article = new Article( $wgTitle );
-			$editPage = new EditPage( $article );
-			WikiEditorHooks::editPageShowEditFormInitial( $editPage, $wgOut );
+			if ( $wgTitle !== null ) {
+				$article = new Article( $wgTitle );
+				$editPage = new EditPage( $article );
+				WikiEditorHooks::editPageShowEditFormInitial( $editPage, $wgOut );
+			}
 			$className = 'wikieditor ';
 		} elseif ( $this->mEditor == 'visualeditor' ) {
 			$className = 'visualeditor ';
@@ -219,13 +224,13 @@ class PFTextAreaInput extends PFFormInput {
 			$rows = 5;
 		}
 
-		$textarea_attrs = array(
+		$textarea_attrs = [
 			'tabindex' => $wgPageFormsTabIndex,
 			'name' => $this->mInputName,
 			'id' => $input_id,
 			'class' => $className,
 			'rows' => $rows,
-		);
+		];
 
 		if ( array_key_exists( 'cols', $this->mOtherArgs ) ) {
 			$textarea_attrs['cols'] = $this->mOtherArgs['cols'];
@@ -265,6 +270,9 @@ class PFTextAreaInput extends PFFormInput {
 		if ( array_key_exists( 'placeholder', $this->mOtherArgs ) ) {
 			$textarea_attrs['placeholder'] = $this->mOtherArgs['placeholder'];
 		}
+		if ( array_key_exists( 'autocapitalize', $this->mOtherArgs ) ) {
+			$textarea_attrs['autocapitalize'] = $this->mOtherArgs['autocapitalize'];
+		}
 		if ( array_key_exists( 'feeds to map', $this->mOtherArgs ) ) {
 			global $wgPageFormsMapsWithFeeders;
 			$targetMapName = $this->mOtherArgs['feeds to map'];
@@ -279,7 +287,7 @@ class PFTextAreaInput extends PFFormInput {
 	 * Returns the HTML code to be included in the output page for this input.
 	 * @return string
 	 */
-	public function getHtmlText() {
+	public function getHtmlText(): string {
 		$textarea_attrs = $this->getTextAreaAttributes();
 
 		$text = Html::element( 'textarea', $textarea_attrs, $this->mCurrentValue );
@@ -296,10 +304,25 @@ class PFTextAreaInput extends PFFormInput {
 		if ( array_key_exists( 'unique', $this->mOtherArgs ) ) {
 			$spanClass .= ' uniqueFieldSpan';
 		}
-		if ( $this->mEditor == 'visualeditor' ) {
+		if ( $this->mEditor == 'visualeditor' && !$this->mIsDisabled ) {
 			$spanClass .= ' ve-area-wrapper';
 		}
-		$text = Html::rawElement( 'span', array( 'class' => $spanClass ), $text );
+		$spanAttrs = [ 'class' => $spanClass ];
+		if ( $this->mEditor == 'visualeditor' ) {
+			// VisualEditor, by default, autogrows with no limit -
+			// which is fine in a regular edit page, but not good
+			// in a form. So we add a "max height" value, which in
+			// turn gets processed by VEForAll into true CSS.
+			if ( array_key_exists( 'max height', $this->mOtherArgs ) ) {
+				$maxHeight = (int)$this->mOtherArgs['max height'];
+			} else {
+				$config = RequestContext::getMain()->getConfig();
+				$maxHeight = $config->get( 'PageFormsVisualEditorMaxHeight' );
+			}
+			$spanAttrs['data-max-height'] = $maxHeight . 'px';
+		}
+
+		$text = Html::rawElement( 'span', $spanAttrs, $text );
 
 		return $text;
 	}

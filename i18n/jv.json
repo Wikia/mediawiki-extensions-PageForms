@@ -1,9 +1,11 @@
 {
 	"@metadata": {
 		"authors": [
+			"Diki Ananta",
 			"Meursault2004",
+			"NoiX180",
 			"Pras",
-			"NoiX180"
+			"Sumbukompor"
 		]
 	},
 	"pageforms-desc": "Formulir kanggo nggawé lan mbesut kaca wiki",
@@ -89,8 +91,9 @@
 	"pf_formedit_addanother": "Tambah liyané",
 	"pf_formedit_none": "Ora ana",
 	"pf_blank_error": "ora olèh kosong",
-	"pf_bad_email_error": "kudu duwé format alamat e-mail sing absah",
+	"pf_bad_email_error": "kudu duwé format alamat layang-èl sing absah",
 	"pf_bad_number_error": "kudu angka sing absah",
+	"pf_bad_integer_error": "kudu integer sing absah",
 	"pf_bad_date_error": "kudu tanggal sing absah",
 	"pf_template_docufooter": "Besut kacané saperlu ndeleng tèksé cithakané.",
 	"pf_form_freetextlabel": "Tèks bébas",
@@ -98,9 +101,9 @@
 	"pf_category_desc": "Iki kategori $1",
 	"pf_blank_namespace": "Pokok",
 	"tooltip-ca-formedit": "Besut kaca iki nganggo formulir",
-	"pf-select2-no-matches": "Ora mathuk",
-	"pf-select2-searching": "Nggoleki...",
-	"pf-select2-input-too-short": "Mangga isèkaké karakter cacah $1 utawa punjul.",
+	"pf-autocomplete-no-matches": "Ora mathuk",
+	"pf-autocomplete-searching": "Nggoleki...",
+	"pf-autocomplete-input-too-short": "Mangga isèkaké karakter cacah $1 utawa punjul.",
 	"pf-maps-enteraddress": "Wuwuh alamat ing kéné",
 	"pf-maps-lookupcoordinates": "Étung koordhinat nganggo alamat",
 	"pf-adminlinks-datastructure": "Yasan dhata",

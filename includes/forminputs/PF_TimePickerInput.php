@@ -11,6 +11,10 @@
  */
 class PFTimePickerInput extends PFFormInput {
 
+	public static function getName(): string {
+		return 'timepicker';
+	}
+
 	/**
 	 * @param string $input_number The number of the input in the form.
 	 * @param string $cur_value The current value of the input field.
@@ -29,21 +33,9 @@ class PFTimePickerInput extends PFFormInput {
 	}
 
 	/**
-	 * Returns the name of the input type this class handles: menuselect.
-	 *
-	 * This is the name to be used in the field definition for the "input type"
-	 * parameter.
-	 *
-	 * @return String The name of the input type this class handles.
-	 */
-	public static function getName() {
-		return 'timepicker';
-	}
-
-	/**
 	 * Set up JS attributes
 	 *
-	 * @return String
+	 * @return string
 	 */
 	protected function setupJsInitAttribs() {
 		global $wgExtensionAssetsPath;
@@ -76,7 +68,7 @@ class PFTimePickerInput extends PFFormInput {
 		}
 
 		// build JS code from attributes array
-		$jsattribs = array(
+		$jsattribs = [
 			'minTime'   => $minTime,
 			'maxTime'   => $maxTime,
 			'interval'  => $interval,
@@ -84,7 +76,7 @@ class PFTimePickerInput extends PFFormInput {
 			'currValue' => $this->mCurrentValue,
 			'disabled'  => $this->mIsDisabled,
 			'userClasses' => $userClasses
-		);
+		];
 
 		if ( array_key_exists( 'part of dtp', $this->mOtherArgs ) ) {
 			$jsattribs['partOfDTP'] = $this->mOtherArgs['part of dtp'];
@@ -109,13 +101,13 @@ class PFTimePickerInput extends PFFormInput {
 	 * should be able to input values.
 	 * @return string
 	 */
-	public function getHtmlText() {
+	public function getHtmlText(): string {
 		// create visible input field (for display) and invisible field (for data)
 		$html = PFDatePickerInput::genericTextHTML( $this->mCurrentValue, $this->mInputName, $this->mIsDisabled, $this->mOtherArgs, 'input_' . $this->mInputNumber );
 
 		// wrap in span (e.g. used for mandatory inputs)
-		if ( ! array_key_exists( 'part of dtp', $this->mOtherArgs ) ) {
-			$html = '<span class="inputSpan' . ( array_key_exists( 'mandatory', $this->mOtherArgs ) ? ' mandatoryFieldSpan' : '' ) . '">' .$html . '</span>';
+		if ( !array_key_exists( 'part of dtp', $this->mOtherArgs ) ) {
+			$html = '<span class="inputSpan' . ( array_key_exists( 'mandatory', $this->mOtherArgs ) ? ' mandatoryFieldSpan' : '' ) . '">' . $html . '</span>';
 		}
 
 		return $html;
@@ -127,7 +119,7 @@ class PFTimePickerInput extends PFFormInput {
 	 * @return string[]
 	 */
 	public static function getOtherPropTypesHandled() {
-		return array( '_str', '_dat' );
+		return [ '_str', '_dat' ];
 	}
 
 	/**
@@ -138,21 +130,21 @@ class PFTimePickerInput extends PFFormInput {
 	 */
 	public static function getParameters() {
 		$params = parent::getParameters();
-		$params['mintime'] = array(
+		$params['mintime'] = [
 			'name' => 'mintime',
 			'type' => 'string',
 			'description' => wfMessage( 'semanticformsinputs-timepicker-mintime' )->text(),
-		);
-		$params['maxtime'] = array(
+		];
+		$params['maxtime'] = [
 			'name' => 'maxtime',
 			'type' => 'string',
 			'description' => wfMessage( 'semanticformsinputs-timepicker-maxtime' )->text(),
-		);
-		$params['interval'] = array(
+		];
+		$params['interval'] = [
 			'name' => 'interval',
 			'type' => 'int',
 			'description' => wfMessage( 'semanticformsinputs-timepicker-interval' )->text(),
-		);
+		];
 
 		return $params;
 	}

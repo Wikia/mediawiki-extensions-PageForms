@@ -27,8 +27,8 @@ abstract class PFFormInput {
 	protected $mIsDisabled;
 	protected $mOtherArgs;
 
-	protected $mJsInitFunctionData = array();
-	protected $mJsValidationFunctionData = array();
+	protected $mJsInitFunctionData = [];
+	protected $mJsValidationFunctionData = [];
 
 	/**
 	 * @param string $input_number The number of the input in the form. For a simple HTML input
@@ -54,16 +54,11 @@ abstract class PFFormInput {
 	 * Returns the name of the input type this class handles.
 	 *
 	 * This is the name to be used in the field definition for the "input type"
-	 * parameter.
+	 * parameter. Used in PFFormPrinter::registerInputType().
 	 *
-	 * @return String The name of the input type this class handles.
-	 * @fixme Should be declared abstract. Static functions cannot be abstract.
-	 * Do we need this method at all? The name should be set outside this class
-	 * when the input type is registered.
+	 * @return string The name of the input type this class handles.
 	 */
-	public static function getName() {
-		return null;
-	}
+	abstract public static function getName();
 
 	/**
 	 * Returns the set of SMW property types which this input can
@@ -80,34 +75,34 @@ abstract class PFFormInput {
 	 * @return array[]
 	 */
 	public static function getParameters() {
-		$params = array();
-		$params['mandatory'] = array(
+		$params = [];
+		$params['mandatory'] = [
 			'name' => 'mandatory',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_mandatory' )->text()
-		);
-		$params['restricted'] = array(
+		];
+		$params['restricted'] = [
 			'name' => 'restricted',
 			'type' => 'boolean',
 			'description' => wfMessage( 'pf_forminputs_restricted' )->text()
-		);
-		$params['class'] = array(
+		];
+		$params['class'] = [
 			'name' => 'class',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_class' )->text()
-		);
+		];
 		if ( defined( 'SMW_VERSION' ) ) {
-			$params['property'] = array(
+			$params['property'] = [
 				'name' => 'property',
 				'type' => 'string',
 				'description' => wfMessage( 'pf_forminputs_property' )->text()
-			);
+			];
 		}
-		$params['default'] = array(
+		$params['default'] = [
 			'name' => 'default',
 			'type' => 'string',
 			'description' => wfMessage( 'pf_forminputs_default' )->text()
-		);
+		];
 		return $params;
 	}
 
@@ -122,7 +117,7 @@ abstract class PFFormInput {
 		if ( array_key_exists( $key, $configVars ) ) {
 			$functionDataArray = $configVars[ $key ];
 		} else {
-			$functionDataArray = array();
+			$functionDataArray = [];
 		}
 		$functionDataArray[ $input_id ] = $functionData;
 		return $functionDataArray;
@@ -144,11 +139,9 @@ abstract class PFFormInput {
 	 * Ideally this HTML code should provide a basic functionality even if the
 	 * browser is not JavaScript capable. I.e. even without JavaScript the user
 	 * should be able to input values.
-	 * @return null
+	 * @return string
 	 */
-	public function getHtmlText() {
-		return null;
-	}
+	abstract public function getHtmlText();
 
 	/**
 	 *
@@ -220,7 +213,7 @@ abstract class PFFormInput {
 		if ( is_string( $param ) ) {
 			$param = json_decode( $param );
 		}
-		$this->mJsInitFunctionData[] = array( 'name' => $name, 'param' => $param );
+		$this->mJsInitFunctionData[] = [ 'name' => $name, 'param' => $param ];
 	}
 
 	/**
@@ -248,7 +241,7 @@ abstract class PFFormInput {
 	 * @param string $param The parameter passed to the initialization function.
 	 */
 	public function addJsValidationFunctionData( $name, $param = 'null' ) {
-		$this->mJsValidationFunctionData[] = array( 'name' => $name, 'param' => $param );
+		$this->mJsValidationFunctionData[] = [ 'name' => $name, 'param' => $param ];
 	}
 
 	/**
@@ -261,7 +254,7 @@ abstract class PFFormInput {
 	 *  default args to be used for this input
 	 */
 	public static function getDefaultPropTypes() {
-		return array();
+		return [];
 	}
 
 	/**
@@ -274,7 +267,7 @@ abstract class PFFormInput {
 	 *  default args to be used for this input
 	 */
 	public static function getDefaultPropTypeLists() {
-		return array();
+		return [];
 	}
 
 	/**
@@ -285,7 +278,7 @@ abstract class PFFormInput {
 	 * @return string[]
 	 */
 	public static function getOtherPropTypesHandled() {
-		return array();
+		return [];
 	}
 
 	/**
@@ -296,24 +289,24 @@ abstract class PFFormInput {
 	 * @return string[]
 	 */
 	public static function getOtherPropTypeListsHandled() {
-		return array();
+		return [];
 	}
 
 	// Now the same set of methods, but for Cargo instead of SMW.
 	public static function getDefaultCargoTypes() {
-		return array();
+		return [];
 	}
 
 	public static function getDefaultCargoTypeLists() {
-		return array();
+		return [];
 	}
 
 	public static function getOtherCargoTypesHandled() {
-		return array();
+		return [];
 	}
 
 	public static function getOtherCargoTypeListsHandled() {
-		return array();
+		return [];
 	}
 
 	/**
@@ -341,10 +334,10 @@ abstract class PFFormInput {
 			$initFunctionData = self::updateFormInputJsFunctionData( 'ext.pf.initFunctionData', $configVars, $this->getJsInitFunctionData(), $input_id );
 			$validationFunctionData = self::updateFormInputJsFunctionData( 'ext.pf.validationFunctionData', $configVars, $this->getJsValidationFunctionData(), $input_id );
 
-			$output->addJsConfigVars( array(
+			$output->addJsConfigVars( [
 				'ext.pf.initFunctionData' => $initFunctionData,
 				'ext.pf.validationFunctionData' => $validationFunctionData
-			) );
+			] );
 		}
 	}
 

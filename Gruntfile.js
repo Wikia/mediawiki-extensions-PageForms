@@ -1,42 +1,34 @@
-/*jshint node:true */
+/* eslint-env node */
 module.exports = function ( grunt ) {
-	grunt.loadNpmTasks( 'grunt-contrib-jshint' );
-	grunt.loadNpmTasks( 'grunt-jsonlint' );
+	grunt.loadNpmTasks( 'grunt-eslint' );
 	grunt.loadNpmTasks( 'grunt-banana-checker' );
 
 	grunt.initConfig( {
-		jshint: {
+		eslint: {
 			options: {
-				jshintrc: true
+				cache: true
 			},
 			all: [
-				'**/*.js',
+				'**/*.{js,json}',
 				'!node_modules/**',
 				'!vendor/**',
 				'!libs/jquery.browser.js',
-				'!libs/jquery.fancytree.js',
-				'!libs/FancyBox/jquery.fancybox.1.3.4.js',
-				'!libs/FancyBox/jquery.fancybox.3.2.10.js',
-				'!libs/jquery.fancytree.ui-deps.js',
-				'!libs/jquery.fancytree.js',
-				'!libs/jsgrid.js',
+				'!libs/jquery.rateyo.js',
+				'!libs/FullCalendar/fullcalendar.js',
+				'!libs/FullCalendar/locale-all.js',
+				'!libs/FancyBox/jquery.fancybox.js',
+				'!libs/jstree.js',
+				'!libs/jsuites.js',
+				'!libs/jspreadsheet.js',
 				'!libs/select2.js',
-				'!libs/Sortable.js',
-				'!libs/PF_maps.js'
+				'!libs/Sortable.js'
 			]
 		},
 		banana: {
 			all: 'i18n/'
-		},
-		jsonlint: {
-			all: [
-				'**/*.json',
-				'!node_modules/**',
-				'!vendor/**'
-			]
 		}
 	} );
 
-	grunt.registerTask( 'test', [ 'jshint', 'jsonlint', 'banana' ] );
+	grunt.registerTask( 'test', [ 'eslint', 'banana' ] );
 	grunt.registerTask( 'default', 'test' );
 };

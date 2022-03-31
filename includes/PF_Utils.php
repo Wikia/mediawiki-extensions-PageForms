@@ -7,26 +7,46 @@
  * @ingroup PF
  */
 
+use MediaWiki\MediaWikiServices;
+
 class PFUtils {
+	// Replace with MediaWiki\Revision\RevisionRecord once MW 1.31 is no longer supported
+	public const FOR_PUBLIC = 1;
+	public const FOR_THIS_USER = 2;
+	public const RAW = 3;
 
 	/**
-	 * Helper function for backward compatibility.
-	 * @param LinkRenderer $linkRenderer
-	 * @param string $title
-	 * @param string|null $msg
-	 * @param array $attrs
-	 * @param array $params
-	 * @return string
+	 * Get a content language (old $wgContLang) object. For MW < 1.32,
+	 * return the global. For all others, use MediaWikiServices.
+	 *
+	 * @return Language
 	 */
-	public static function makeLink( $linkRenderer, $title, $msg = null, $attrs = array(), $params = array() ) {
-		if ( !is_null( $linkRenderer ) ) {
-			// MW 1.28+
-			// Is there a makeLinkKnown() method? We'll just do it
-			// manually.
-			return $linkRenderer->makeLink( $title, $msg, $attrs, $params, array( 'known' ) );
+	public static function getContLang() {
+		if ( method_exists( "MediaWiki\\MediaWikiServices", "getContentLanguage" ) ) {
+			return MediaWikiServices::getInstance()->getContentLanguage();
 		} else {
-			return Linker::linkKnown( $title, $msg, $attrs, $params );
+			global $wgContLang;
+			return $wgContLang;
 		}
+	}
+
+	public static function getSMWContLang() {
+		if ( function_exists( 'smwfContLang' ) ) {
+			// SMW 3.2+
+			return smwfContLang();
+		} else {
+			global $smwgContLang;
+			return $smwgContLang;
+		}
+	}
+
+	/**
+	 * Get a parser object.
+	 *
+	 * @return Parser
+	 */
+	public static function getParser() {
+		return MediaWikiServices::getInstance()->getParser();
 	}
 
 	/**
@@ -36,9 +56,34 @@ class PFUtils {
 	 * @return string
 	 */
 	public static function linkForSpecialPage( $linkRenderer, $specialPageName ) {
-		$specialPage = SpecialPageFactory::getPage( $specialPageName );
-		return self::makeLink( $linkRenderer, $specialPage->getPageTitle(),
+		$specialPage = self::getSpecialPage( $specialPageName );
+		return $linkRenderer->makeKnownLink( $specialPage->getPageTitle(),
 			htmlspecialchars( $specialPage->getDescription() ) );
+	}
+
+	/**
+	 * @param LinkRenderer $linkRenderer
+	 * @param LinkTarget|Title $title
+	 * @param string|null $msg Must already be HTML escaped
+	 * @param array $attrs link attributes
+	 * @param array $params query parameters
+	 *
+	 * @return string HTML link
+	 *
+	 * Copied from CargoUtils::makeLink().
+	 */
+	public static function makeLink( $linkRenderer, $title, $msg = null, $attrs = [], $params = [] ) {
+		global $wgTitle;
+
+		if ( $title === null ) {
+			return null;
+		} elseif ( $wgTitle !== null && $title->equals( $wgTitle ) ) {
+			// Display bolded text instead of a link.
+			return Linker::makeSelfLinkObj( $title, $msg );
+		} else {
+			$html = ( $msg == null ) ? null : new HtmlArmor( $msg );
+			return $linkRenderer->makeLink( $title, $html, $attrs, $params );
+		}
 	}
 
 	/**
@@ -54,8 +99,7 @@ class PFUtils {
 			$namespace .= ':';
 		}
 		if ( MWNamespace::isCapitalized( $title->getNamespace() ) ) {
-			global $wgContLang;
-			return $namespace . $wgContLang->ucfirst( $title->getPartialURL() );
+			return $namespace . self::getContLang()->ucfirst( $title->getPartialURL() );
 		} else {
 			return $namespace . $title->getPartialURL();
 		}
@@ -73,8 +117,7 @@ class PFUtils {
 			$namespace .= ':';
 		}
 		if ( MWNamespace::isCapitalized( $title->getNamespace() ) ) {
-			global $wgContLang;
-			return $namespace . $wgContLang->ucfirst( $title->getText() );
+			return $namespace . self::getContLang()->ucfirst( $title->getText() );
 		} else {
 			return $namespace . $title->getText();
 		}
@@ -83,29 +126,42 @@ class PFUtils {
 	/**
 	 * Gets the text contents of a page with the passed-in Title object.
 	 * @param Title $title
+	 * @param int $audience
 	 * @return string|null
 	 */
-	public static function getPageText( $title ) {
+	public static function getPageText( $title, $audience = self::FOR_PUBLIC ) {
 		$wikiPage = new WikiPage( $title );
-		$content = $wikiPage->getContent();
-		if ( $content !== null ) {
-			return $content->getNativeData();
+		$content = $wikiPage->getContent( $audience );
+		if ( $content instanceof TextContent ) {
+			// Since MW 1.33
+			if ( method_exists( $content, 'getText' ) ) {
+				return $content->getText();
+			} else {
+				return $content->getNativeData();
+			}
 		} else {
 			return null;
 		}
 	}
 
+	public static function getSpecialPage( $pageName ) {
+		if ( class_exists( 'MediaWiki\Special\SpecialPageFactory' ) ) {
+			// MW 1.32+
+			return MediaWikiServices::getInstance()
+				->getSpecialPageFactory()
+				->getPage( $pageName );
+		} else {
+			return SpecialPageFactory::getPage( $pageName );
+		}
+	}
+
 	/**
-	 * Helper function to get the SMW data store for different versions
-	 * of SMW.
+	 * Helper function to get the SMW data store, if SMW is installed.
 	 * @return Store|null
 	 */
 	public static function getSMWStore() {
 		if ( class_exists( '\SMW\StoreFactory' ) ) {
-			// SMW 1.9+
 			return \SMW\StoreFactory::getStore();
-		} elseif ( function_exists( 'smwfGetStore' ) ) {
-			return smwfGetStore();
 		} else {
 			return null;
 		}
@@ -120,10 +176,10 @@ class PFUtils {
 	 */
 	public static function linkText( $namespace, $name, $text = null ) {
 		$title = Title::makeTitleSafe( $namespace, $name );
-		if ( is_null( $title ) ) {
+		if ( $title === null ) {
 			return $name; // TODO maybe report an error here?
 		}
-		if ( is_null( $text ) ) {
+		if ( $text === null ) {
 			return '[[:' . $title->getPrefixedText() . '|' . $name . ']]';
 		} else {
 			return '[[:' . $title->getPrefixedText() . '|' . $text . ']]';
@@ -177,14 +233,20 @@ END;
 		$form_body .= Html::hidden( 'wpSummary', $edit_summary );
 		$form_body .= Html::hidden( 'wpStarttime', $start_time );
 		$form_body .= Html::hidden( 'wpEdittime', $edit_time );
+		// @TODO - add this in at some point. For now, most of these
+		// fields are not getting used anyway.
+		//$form_body .= Html::hidden( 'editRevId', $edit_rev_id );
 
-		if ( $wgUser->isLoggedIn() ) {
-			$edit_token = $wgUser->getEditToken();
-		} elseif ( class_exists( '\MediaWiki\Session\Token' ) ) {
-			// MW 1.27+
-			$edit_token = \MediaWiki\Session\Token::SUFFIX;
+		if ( method_exists( $wgUser, 'isRegistered' ) ) {
+			// MW 1.34+
+			$userIsRegistered = $wgUser->isRegistered();
 		} else {
-			$edit_token = EDIT_TOKEN_SUFFIX;
+			$userIsRegistered = $wgUser->isLoggedIn();
+		}
+		if ( $userIsRegistered ) {
+			$edit_token = $wgUser->getEditToken();
+		} else {
+			$edit_token = \MediaWiki\Session\Token::SUFFIX;
 		}
 		$form_body .= Html::hidden( 'wpEditToken', $edit_token );
 		$form_body .= Html::hidden( $action, null );
@@ -195,14 +257,17 @@ END;
 		if ( $watch_this ) {
 			$form_body .= Html::hidden( 'wpWatchthis', null );
 		}
+
+		$form_body .= Html::hidden( 'wpUltimateParam', true );
+
 		$text .= Html::rawElement(
 			'form',
-			array(
+			[
 				'id' => 'editform',
 				'name' => 'editform',
 				'method' => 'post',
 				'action' => $title instanceof Title ? $title->getLocalURL( 'action=submit' ) : $title
-			),
+			],
 			$form_body
 		);
 
@@ -214,7 +279,7 @@ END;
 	</script>
 
 END;
-		Hooks::run( 'PageForms::PrintRedirectForm', array( $is_save, $is_preview, $is_diff, &$text ) );
+		Hooks::run( 'PageForms::PrintRedirectForm', [ $is_save, $is_preview, $is_diff, &$text ] );
 		return $text;
 	}
 
@@ -226,8 +291,7 @@ END;
 	 * @param Parser|null $parser
 	 */
 	public static function addFormRLModules( $parser = null ) {
-		global $wgOut, $wgPageFormsSimpleUpload, $wgVersion,
-			$wgUsejQueryThree;
+		global $wgOut, $wgPageFormsSimpleUpload;
 
 		// Handling depends on whether or not this form is embedded
 		// in another page.
@@ -238,11 +302,10 @@ END;
 			$output = $parser->getOutput();
 		}
 
-		$mainModules = array(
+		$mainModules = [
 			'ext.pageforms.main',
 			'ext.pageforms.submit',
 			'ext.smw.tooltips',
-			'ext.smw.sorttable',
 			// @TODO - the inclusion of modules for specific
 			// form inputs is wasteful, and should be removed -
 			// it should only be done as needed for each input.
@@ -250,19 +313,16 @@ END;
 			// templates makes that tricky (every form input needs
 			// to re-apply the JS on a new instance) - it can be
 			// done via JS hooks, but it hasn't been done yet.
-			'ext.pageforms.fancytree',
+			'ext.pageforms.jstree',
 			'ext.pageforms.imagepreview',
 			'ext.pageforms.autogrow',
 			'ext.pageforms.checkboxes',
 			'ext.pageforms.select2',
-			'ext.pageforms.rating'
-		);
-
-		if ( version_compare( $wgVersion, '1.30', '<' ) || $wgUsejQueryThree === false ) {
-			$mainModules[] = 'ext.pageforms.fancybox.jquery1';
-		} else {
-			$mainModules[] = 'ext.pageforms.fancybox.jquery3';
-		}
+			'ext.pageforms.rating',
+			'ext.pageforms.fancybox',
+			'ext.pageforms.fullcalendar',
+			'jquery.makeCollapsible'
+		];
 
 		if ( $wgPageFormsSimpleUpload ) {
 			$mainModules[] = 'ext.pageforms.simpleupload';
@@ -270,8 +330,8 @@ END;
 
 		$output->addModules( $mainModules );
 
-		$otherModules = array();
-		Hooks::run( 'PageForms::AddRLModules', array( &$otherModules ) );
+		$otherModules = [];
+		Hooks::run( 'PageForms::AddRLModules', [ &$otherModules ] );
 		foreach ( $otherModules as $rlModule ) {
 			$output->addModules( $rlModule );
 		}
@@ -285,35 +345,26 @@ END;
 		$dbr = wfGetDB( DB_REPLICA );
 		$res = $dbr->select( 'page',
 			'page_title',
-			array( 'page_namespace' => PF_NS_FORM,
-				'page_is_redirect' => false ),
+			[ 'page_namespace' => PF_NS_FORM,
+				'page_is_redirect' => false ],
 			__METHOD__,
-			array( 'ORDER BY' => 'page_title' ) );
-		$form_names = array();
+			[ 'ORDER BY' => 'page_title' ] );
+		$form_names = [];
 		while ( $row = $dbr->fetchRow( $res ) ) {
-			$form_names[] = str_replace( '_', ' ', $row[0] );
+			$form_names[] = str_replace( '_', ' ', $row['page_title'] );
 		}
 		$dbr->freeResult( $res );
+		if ( count( $form_names ) == 0 ) {
+			// This case requires special handling in the UI.
+			throw new MWException( wfMessage( 'pf-noforms-error' )->parse() );
+		}
 		return $form_names;
 	}
 
-	/**
-	 * Creates a dropdown of possible form names.
-	 * @param array|null $form_names
-	 * @return string
-	 */
-	public static function formDropdownHTML( $form_names = null ) {
-		global $wgContLang;
-		$namespace_labels = $wgContLang->getNamespaces();
-		$form_label = $namespace_labels[PF_NS_FORM];
-		if ( $form_names === null ) {
-			$form_names = self::getAllForms();
-		}
-		$select_body = "\n";
-		foreach ( $form_names as $form_name ) {
-			$select_body .= "\t" . Html::element( 'option', null, $form_name ) . "\n";
-		}
-		return "\t" . Html::rawElement( 'label', array( 'for' => 'formSelector' ), $form_label . wfMessage( 'colon-separator' )->escaped() ) . "\n" . Html::rawElement( 'select', array( 'id' => 'formSelector', 'name' => 'form' ), $select_body ) . "\n";
+	public static function getFormDropdownLabel() {
+		$namespaceStrings = self::getContLang()->getNamespaces();
+		$formNSString = $namespaceStrings[PF_NS_FORM];
+		return $formNSString . wfMessage( 'colon-separator' )->escaped();
 	}
 
 	/**
@@ -335,16 +386,16 @@ END;
 	 */
 	static function smartSplitFormTag( $string ) {
 		if ( $string == '' ) {
-			return array();
+			return [];
 		}
 
 		$delimiter = '|';
-		$returnValues = array();
+		$returnValues = [];
 		$numOpenCurlyBrackets = 0;
 		$curReturnValue = '';
 
 		for ( $i = 0; $i < strlen( $string ); $i++ ) {
-			$curChar = $string{$i};
+			$curChar = $string[$i];
 			if ( $curChar == '{' ) {
 				$numOpenCurlyBrackets++;
 			} elseif ( $curChar == '}' ) {
@@ -378,11 +429,11 @@ END;
 		// regex adapted from:
 		// https://www.regular-expressions.info/recurse.html
 		$pattern = '/{{(?>[^{}]|(?R))*?}}/'; // needed to fix highlighting - <?
-		$str = preg_replace_callback( $pattern, function ( $match ) {
+		$str = preg_replace_callback( $pattern, static function ( $match ) {
 			$hasPipe = strpos( $match[0], '|' );
 			return $hasPipe ? str_replace( "|", "\1", $match[0] ) : $match[0];
 		}, $str );
-		return array_map( array( 'PFUtils', 'convertBackToPipes' ), self::smartSplitFormTag( $str ) );
+		return array_map( [ 'PFUtils', 'convertBackToPipes' ], self::smartSplitFormTag( $str ) );
 	}
 
 	/**
@@ -430,4 +481,26 @@ END;
 		return $merged;
 	}
 
+	/**
+	 * Return whether to "ignore" (treat as a non-form) a form with this
+	 * name, based on whether it matches any of the specified text patterns.
+	 *
+	 * @param string $formName
+	 * @return bool
+	 */
+	public static function ignoreFormName( $formName ) {
+		global $wgPageFormsIgnoreTitlePattern;
+
+		if ( !is_array( $wgPageFormsIgnoreTitlePattern ) ) {
+			$wgPageFormsIgnoreTitlePattern = [ $wgPageFormsIgnoreTitlePattern ];
+		}
+
+		foreach ( $wgPageFormsIgnoreTitlePattern as $pattern ) {
+			if ( preg_match( '/' . $pattern . '/', $formName ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
