@@ -638,7 +638,6 @@ class PFFormField {
 					$str = $field_query_val;
 				}
 				return str_replace( [ '<', '>' ], [ '&lt;', '&gt;' ], $str );
-
 			}
 		}
 
