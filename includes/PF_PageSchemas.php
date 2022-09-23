@@ -676,7 +676,7 @@ class PFPageSchemas extends PSExtensionHandler {
 				$psTemplate = $psFormItem['item'];
 				$templateName = $psTemplate->getName();
 				$templateTitle = Title::makeTitleSafe( NS_TEMPLATE, $templateName );
-				$fullTemplateName = PageSchemas::titleString( $templateTitle );
+				$fullTemplateName = $templateTitle->getPrefixedText();
 				$template_fields = self::getFieldsFromTemplateSchema( $psTemplate );
 				// Get property for use in either #set_internal
 				// or #subobject, defined by either SIO's or
@@ -791,7 +791,7 @@ class PFPageSchemas extends PSExtensionHandler {
 		if ( !empty( $formName ) ) {
 			$formInfo = self::getMainFormInfo( $pageSchemaObj );
 			$formTitle = Title::makeTitleSafe( PF_NS_FORM, $formName );
-			$fullFormName = PageSchemas::titleString( $formTitle );
+			$fullFormName = $formTitle->getPrefixedText();
 			if ( in_array( $fullFormName, $selectedPages ) ) {
 				self::generateForm( $formName, $formTitle,
 					$form_items, $formInfo, $categoryName );
