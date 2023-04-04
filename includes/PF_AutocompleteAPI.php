@@ -334,7 +334,7 @@ class PFAutocompleteAPI extends ApiBase {
 
 		$values = [];
 		while ( $row = $res->fetchRow() ) {
-			$values[] = str_replace( '_', ' ', $row[0] );
+			$values[] = str_replace( '_', ' ', array_shift( $row ) );
 		}
 		$res->free();
 		$values = self::shiftExactMatch( $substring, $values );
