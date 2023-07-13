@@ -189,6 +189,7 @@ class PFFormEdit extends UnlistedSpecialPage {
 		$pre_form_html = '';
 		Hooks::run( 'PageForms::HTMLBeforeForm', [ &$targetTitle, &$pre_form_html ] );
 		$text .= $pre_form_html;
+		$text .= Html::hidden( 'forceflame', 'lol-pageforms' );
 
 		$out->addHTML( $text );
 		// This should be before the closing </form> tag from $result

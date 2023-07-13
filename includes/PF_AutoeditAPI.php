@@ -5,6 +5,7 @@
  * @ingroup PageForms
  */
 
+use MediaWiki\Logger\LoggerFactory;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 
@@ -128,6 +129,9 @@ class PFAutoeditAPI extends ApiBase {
 		try {
 			$this->doAction();
 		} catch ( Exception $e ) {
+			LoggerFactory::getInstance( 'pfautoedit' )->error( 'error while editing form', [
+				'exception' => $e
+			] );
 			// This has to be Exception, not MWException, due to
 			// DateTime errors and possibly others.
 			$this->logMessage( PFUtils::getParser()->recursiveTagParseFully( $e->getMessage() ), $e->getCode() );
