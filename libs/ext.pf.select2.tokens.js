@@ -40,7 +40,6 @@
 	 *
 	 */
 	tokens_proto.apply = function( element ) {
-		var cur_val = element.attr('value');
 		var existingValuesOnly = (element.attr("existingvaluesonly") == "true");
 		this.existingValuesOnly = existingValuesOnly;
 		this.id = element.attr( "id" );
@@ -102,7 +101,7 @@
 
 			if( !elem ) {
 				var data = $(element).select2('data');
-				elem = data.filter(obj => {
+				elem = data.filter(function(obj) {
 					return obj.id === evt.params.data.id
 				});
 				if( !elem.length || !elem[0] || typeof elem[0].element == 'undefined' ) {
@@ -404,7 +403,7 @@
 					// Support for getting query values from an existing field in the form
 					var dsource_copy = data_source;
 					var terms = dsource_copy.split( "&" );
-					terms.forEach( element => {
+					terms.forEach( function(element) {
 						var subTerms = element.split( "=" );
 						var matches = subTerms[1].match( /\[(.*?)\]/ );
 						if ( matches ) {

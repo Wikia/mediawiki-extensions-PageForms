@@ -50,14 +50,7 @@ class PFTemplate {
 		if ( $templateTitle === null ) {
 			return;
 		}
-		$services = MediaWikiServices::getInstance();
-		if ( method_exists( $services, 'getPageProps' ) ) {
-			// MW 1.36+
-			$pageProps = $services->getPageProps();
-		} else {
-			$pageProps = PageProps::getInstance();
-		}
-		$properties = $pageProps->getProperties(
+		$properties = MediaWikiServices::getInstance()->getPageProps()->getProperties(
 			[ $templateTitle ], [ 'PageFormsTemplateParams' ]
 		);
 		if ( count( $properties ) == 0 ) {
@@ -480,7 +473,7 @@ class PFTemplate {
 	public function createText() {
 		// Avoid PHP 7.1 warning from passing $this by reference
 		$template = $this;
-		Hooks::run( 'PageForms::CreateTemplateText', [ &$template ] );
+		MediaWikiServices::getInstance()->getHookContainer()->run( 'PageForms::CreateTemplateText', [ &$template ] );
 		// Check whether the user needs the full wikitext instead of #template_display
 		if ( $this->mFullWikiText ) {
 			$templateHeader = wfMessage( 'pf_template_docu', $this->mTemplateName )->inContentLanguage()->text();
@@ -764,7 +757,8 @@ END;
 	function createTextForField( $field ) {
 		$text = '';
 		$fieldStart = $this->mFieldStart;
-		Hooks::run( 'PageForms::TemplateFieldStart', [ $field, &$fieldStart ] );
+		$hookContainer = MediaWikiServices::getInstance()->getHookContainer();
+		$hookContainer->run( 'PageForms::TemplateFieldStart', [ $field, &$fieldStart ] );
 		if ( $fieldStart != '' ) {
 			$text .= "$fieldStart ";
 		}
@@ -773,7 +767,7 @@ END;
 		$text .= $field->createText( $cargoInUse );
 
 		$fieldEnd = $this->mFieldEnd;
-		Hooks::run( 'PageForms::TemplateFieldEnd', [ $field, &$fieldEnd ] );
+		$hookContainer->run( 'PageForms::TemplateFieldEnd', [ $field, &$fieldEnd ] );
 		if ( $fieldEnd != '' ) {
 			$text .= " $fieldEnd";
 		}

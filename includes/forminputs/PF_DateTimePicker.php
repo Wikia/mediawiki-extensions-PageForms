@@ -52,7 +52,8 @@ class PFDateTimePicker extends PFFormInput {
 			'value' => $this->mCurrentValue,
 			'id' => $inputID,
 			'classes' => [ 'pfDateTimePicker', 'pfPicker' ],
-			'infusable' => true
+			'infusable' => true,
+			'disabled' => $this->mIsDisabled
 		] );
 		$text = $widget->toString();
 
@@ -65,7 +66,7 @@ class PFDateTimePicker extends PFFormInput {
 		$text .= Html::element( 'label',
 			[
 				'for' => $inputID,
-				'class' => 'oo-ui-labelWidget oo-ui-inline-help',
+				'class' => 'pf-datetimepicker-help oo-ui-labelWidget oo-ui-inline-help',
 				'style' => 'margin-top: 4px;'
 			],
 			wfMessage( 'pf-datetimepicker-24hour' )->parse()
