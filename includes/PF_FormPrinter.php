@@ -14,6 +14,7 @@
  */
 
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Permissions\PermissionManager;
 
 class PFFormPrinter {
 
@@ -905,8 +906,9 @@ END;
 		// permission errors from the start, and use those to determine
 		// whether the page is editable.
 		if ( !$is_query ) {
+			$rigor = $form_submitted ? PermissionManager::RIGOR_SECURE : PermissionManager::RIGOR_FULL;
 			$permissionErrors = MediaWikiServices::getInstance()->getPermissionManager()
-				->getPermissionErrors( 'edit', $user, $this->mPageTitle );
+				->getPermissionErrors( 'edit', $user, $this->mPageTitle, $rigor );
 			if ( MediaWikiServices::getInstance()->getReadOnlyMode()->isReadOnly() ) {
 				$permissionErrors = [ [ 'readonlytext', [ MediaWikiServices::getInstance()->getReadOnlyMode()->getReason() ] ] ];
 			}
