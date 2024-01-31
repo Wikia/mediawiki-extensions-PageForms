@@ -36,6 +36,7 @@ class PFFormPrinterTest extends MediaWikiIntegrationTestCase {
 	public function testPageSectionsWithoutExistingPages( $setup, $expected ) {
 		global $wgPageFormsFormPrinter, $wgOut;
 
+
 		$wgOut->getContext()->setTitle( $this->getTitle() );
 
 		list( $form_text, $page_text, $form_page_title, $generated_page_name ) =
@@ -52,11 +53,12 @@ class PFFormPrinterTest extends MediaWikiIntegrationTestCase {
 				$user = self::getTestUser()->getUser()
 			);
 
+
 		$this->assertStringContainsString(
 			$expected['expected_form_text'],
 			$form_text,
 			'asserts that formHTML() returns the correct HTML text for the form for the given test input'
-			);
+		);
 		$this->assertStringContainsString(
 			$expected['expected_page_text'],
 			$page_text,
@@ -118,6 +120,26 @@ class PFFormPrinterTest extends MediaWikiIntegrationTestCase {
 		[
 			'expected_form_text' => "<input type=\"hidden\" name=\"_section[section 4]\">",
 			'expected_page_text' => "====section 4====" ]
+		];
+
+		// #6 'hidden' parameter set
+		$provider[] = [
+		[
+			'form_definition' => "====section 4====
+								 {{{section|section 4|level=4|hidden}}}" ],
+		[
+			'expected_form_text' => "<input type=\"hidden\" name=\"_section[section 4]\">",
+			'expected_page_text' => "====section 4====" ]
+		];
+
+		$provider[] = [
+			[
+				'form_definition' => "{{{for template|TestTemplate123}}}{{{section|section 5|level=4|hidden}}}{{{end template}}}",
+			],
+			[
+				'expected_form_text' => "<input type=\"hidden\" name=\"_section[section 5]\">",
+				'expected_page_text' => "{{TestTemplate123}}\n====section 5====",
+			],
 		];
 
 		return $provider;
