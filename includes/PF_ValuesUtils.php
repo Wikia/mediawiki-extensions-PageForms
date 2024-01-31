@@ -49,7 +49,6 @@ class PFValuesUtils {
 				$values[] = str_replace( '_', ' ', $value->getSortKey() );
 			}
 		}
-		$values = self::shiftShortestMatch( $values );
 		return $values;
 	}
 
@@ -62,7 +61,7 @@ class PFValuesUtils {
 	 */
 	public static function getCategoriesForPage( $title ) {
 		$categories = [];
-		$db = wfGetDB( DB_REPLICA );
+		$db = PFUtils::getReadDB();
 		$titlekey = $title->getArticleID();
 		if ( $titlekey == 0 ) {
 			// Something's wrong - exit
@@ -88,7 +87,7 @@ class PFValuesUtils {
 	 */
 	public static function getAllCategories() {
 		$categories = [];
-		$db = wfGetDB( DB_REPLICA );
+		$db = PFUtils::getReadDB();
 		$res = $db->select(
 			'category',
 			'cat_title',
@@ -120,7 +119,6 @@ class PFValuesUtils {
 		$requestoptions->limit = self::getMaxValuesToRetrieve();
 		$values = self::getSMWPropertyValues( $store, null, $property_name, $requestoptions );
 		sort( $values );
-		$values = self::shiftShortestMatch( $values );
 		return $values;
 	}
 
@@ -249,14 +247,13 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 			$fieldAlias = str_replace( '_', ' ', $fieldName );
 		}
 		foreach ( $queryResults as $row ) {
-			if ( !array_key_exists( $fieldAlias, $row ) ) {
+			if ( !isset( $row[$fieldAlias] ) ) {
 				continue;
 			}
-			// Cargo HTML-encodes everything - let's decode double
-			// quotes, at least.
-			$values[] = str_replace( '&quot;', '"', $row[$fieldAlias] );
+			// Cargo HTML-encodes everything - decode the quotes and
+			// angular brackets.
+			$values[] = html_entity_decode( $row[$fieldAlias] );
 		}
-		$values = self::shiftShortestMatch( $values );
 		return $values;
 	}
 
@@ -276,7 +273,7 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 		}
 		global $wgPageFormsUseDisplayTitle;
 
-		$db = wfGetDB( DB_REPLICA );
+		$db = PFUtils::getReadDB();
 		$top_category = str_replace( ' ', '_', $top_category );
 		$categories = [ $top_category ];
 		$checkcategories = [ $top_category ];
@@ -454,15 +451,9 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 		}
 
 		if ( $wgPageFormsUseDisplayTitle ) {
-			$services = MediaWikiServices::getInstance();
-			if ( method_exists( $services, 'getPageProps' ) ) {
-				// MW 1.36+
-				$pageProps = $services->getPageProps();
-			} else {
-				$pageProps = PageProps::getInstance();
-			}
-			$properties = $pageProps->getProperties( $titles,
-				[ 'displaytitle', 'defaultsort' ] );
+			$properties = MediaWikiServices::getInstance()->getPageProps()->getProperties(
+				$titles, [ 'displaytitle', 'defaultsort' ]
+			);
 			foreach ( $titles as $title ) {
 				if ( array_key_exists( $title->getArticleID(), $properties ) ) {
 					$titleprops = $properties[$title->getArticleID()];
@@ -571,7 +562,7 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 			$namespaceConditions[] = "page_namespace = $matchingNamespaceCode";
 		}
 
-		$db = wfGetDB( DB_REPLICA );
+		$db = PFUtils::getReadDB();
 		$conditions = [];
 		$conditions[] = implode( ' OR ', $namespaceConditions );
 		$tables = [ 'page' ];
@@ -682,7 +673,16 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 		} elseif ( $source_type == 'concept' ) {
 			$names_array = self::getAllPagesForConcept( $source_name );
 		} elseif ( $source_type == 'query' ) {
-			$names_array = self::getAllPagesForQuery( $source_name );
+			// Get rid of the "@", which is a placeholder for the substring,
+			// since there is no substring here.
+			// May not cover all possible use cases.
+			$baseQuery = str_replace(
+				[ "~*@*", "~@*", "~*@", "~@", "like:*@*", "like:@*", "like:*@", "like:@", "&lt;@", "&gt;@", "@" ],
+				"+",
+				$source_name
+			);
+			$smwQuery = self::processSemanticQuery( $baseQuery );
+			$names_array = self::getAllPagesForQuery( $smwQuery );
 		} elseif ( $source_type == 'wikidata' ) {
 			$names_array = self::getAllValuesFromWikidata( $source_name );
 			sort( $names_array );
@@ -714,6 +714,9 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 		} elseif ( array_key_exists( 'values from wikidata', $field_args ) ) {
 			$autocompleteFieldType = 'wikidata';
 			$autocompletionSource = $field_args['values from wikidata'];
+		} elseif ( array_key_exists( 'values from query', $field_args ) ) {
+			$autocompletionSource = $field_args['values from query'];
+			$autocompleteFieldType = 'semantic_query';
 		} elseif ( array_key_exists( 'values', $field_args ) ) {
 			global $wgPageFormsFieldNum;
 			$autocompleteFieldType = 'values';
@@ -733,9 +736,6 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 				$whereStr = $field_args['cargo where'];
 				$autocompletionSource .= "|$whereStr";
 			}
-		} elseif ( array_key_exists( 'semantic_query', $field_args ) ) {
-			$autocompletionSource = $field_args['semantic_query'];
-			$autocompleteFieldType = 'semantic_query';
 		} elseif ( array_key_exists( 'semantic_property', $field_args ) ) {
 			$autocompletionSource = $field_args['semantic_property'];
 			$autocompleteFieldType = 'property';
@@ -824,6 +824,8 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 	public static function getValuesArray( $value, $delimiter ) {
 		if ( is_array( $value ) ) {
 			return $value;
+		} elseif ( $value == null ) {
+			return [];
 		} else {
 			// Remove extra spaces.
 			return array_map( 'trim', explode( $delimiter, $value ) );
@@ -869,7 +871,7 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 	public static function getSQLConditionForAutocompleteInColumn( $column, $substring, $replaceSpaces = true ) {
 		global $wgPageFormsAutocompleteOnAllChars;
 
-		$db = wfGetDB( DB_REPLICA );
+		$db = PFUtils::getReadDB();
 
 		// CONVERT() is also supported in PostgreSQL, but it doesn't
 		// seem to work the same way.
@@ -905,11 +907,16 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 	 * @return array
 	 */
 	public static function getAllPagesForQuery( $rawQuery ) {
+		global $wgPageFormsMaxAutocompleteValues;
 		global $wgPageFormsUseDisplayTitle;
-		$rawQueryArray = [ $rawQuery ];
+
+		$rawQuery = $rawQuery . "|named args=yes|link=none|limit=$wgPageFormsMaxAutocompleteValues|searchlabel=";
+		$rawQueryArray = explode( "|", $rawQuery );
 		list( $queryString, $processedParams, $printouts ) = SMWQueryProcessor::getComponentsFromFunctionParams( $rawQueryArray, false );
 		SMWQueryProcessor::addThisPrintout( $printouts, $processedParams );
 		$processedParams = SMWQueryProcessor::getProcessedParams( $processedParams, $printouts );
+
+		// Run query and get results.
 		$queryObj = SMWQueryProcessor::createQuery( $queryString,
 			$processedParams,
 			SMWQueryProcessor::SPECIAL_PAGE, '', $printouts );
@@ -919,37 +926,24 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 		$pages = [];
 
 		foreach ( $rows as $diWikiPage ) {
+			$pages[] = $diWikiPage->getDbKey();
 			$titles[] = $diWikiPage->getTitle();
 		}
 
 		if ( $wgPageFormsUseDisplayTitle ) {
-			$services = MediaWikiServices::getInstance();
-			if ( method_exists( $services, 'getPageProps' ) ) {
-				// MW 1.36+
-				$pageProps = $services->getPageProps();
-			} else {
-				$pageProps = PageProps::getInstance();
-			}
-			$properties = $pageProps->getProperties( $titles,
-				[ 'displaytitle', 'defaultsort' ] );
-			foreach ( $titles as $title ) {
-				if ( array_key_exists( $title->getArticleID(), $properties ) ) {
-					$titleprops = $properties[$title->getArticleID()];
-				} else {
-					$titleprops = [];
-				}
-
-				$titleText = $title->getPrefixedText();
-				if ( array_key_exists( 'displaytitle', $titleprops ) &&
-					 trim( str_replace( '&#160;', '', strip_tags( $titleprops['displaytitle'] ) ) ) !== '' ) {
-					$pages[$titleText] = htmlspecialchars_decode( $titleprops['displaytitle'] );
-				} else {
-					$pages[$titleText] = $titleText;
-				}
-			}
+			$pages = PFMappingUtils::getDisplayTitles( $titles );
 		}
 
 		return $pages;
+	}
+
+	public static function processSemanticQuery( $query, $substr = '' ) {
+		$query = str_replace(
+			[ "&lt;", "&gt;", "(", ")", '%', '@' ],
+			[ "<", ">", "[", "]", '|', $substr ],
+			$query
+		);
+		return $query;
 	}
 
 	public static function getMaxValuesToRetrieve( $substring = null ) {
@@ -972,44 +966,6 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 	}
 
 	/**
-	 * Doing "mapping" on values can potentially lead to more than one
-	 * value having the same "label". To avoid this, we find duplicate
-	 * labels, if there are any, add on the real value, in parentheses,
-	 * to all of them.
-	 *
-	 * @param array $labels
-	 * @return array
-	 */
-	public static function disambiguateLabels( array $labels ) {
-		asort( $labels );
-		if ( count( $labels ) == count( array_unique( $labels ) ) ) {
-			return $labels;
-		}
-		$fixed_labels = [];
-		foreach ( $labels as $value => $label ) {
-			$fixed_labels[$value] = $labels[$value];
-		}
-		$counts = array_count_values( $fixed_labels );
-		foreach ( $counts as $current_label => $count ) {
-			if ( $count > 1 ) {
-				$matching_keys = array_keys( $labels, $current_label );
-				foreach ( $matching_keys as $key ) {
-					$fixed_labels[$key] .= ' (' . $key . ')';
-				}
-			}
-		}
-		if ( count( $fixed_labels ) == count( array_unique( $fixed_labels ) ) ) {
-			return $fixed_labels;
-		}
-		// If that didn't work, just add on " (value)" to *all* the
-		// labels. @TODO - is this necessary?
-		foreach ( $labels as $value => $label ) {
-			$labels[$value] .= ' (' . $value . ')';
-		}
-		return $labels;
-	}
-
-	/**
 	 * Get the exact canonical namespace string, given a user-created string
 	 *
 	 * @param string $namespaceStr
@@ -1021,28 +977,17 @@ SERVICE wikibase:label { bd:serviceParam wikibase:language \"" . $wgLanguageCode
 	}
 
 	/**
-	 * We want the result string matching what the user has currently typed (if
-	 * there is one) to be at the top. However, with local autocompletion, we
-	 * unfortunately don't know what the user's current input is. So instead we
-	 * just take the shortest result string and move that to the top, and hope
-	 * that it's a match.
-	 *
+	 * Map a label back to a value.
+	 * @param string $label
 	 * @param array $values
-	 * @return array $values
+	 * @return string
 	 */
-	public static function shiftShortestMatch( $values ) {
-		if ( empty( $values ) ) {
-			return $values;
+	public static function labelToValue( $label, $values ) {
+		$value = array_search( $label, $values );
+		if ( $value === false ) {
+			return $label;
+		} else {
+			return $value;
 		}
-		$shortestString = $values[ 0 ];
-		foreach ( $values as $val ) {
-			if ( strlen( $val ) < strlen( $shortestString ) ) {
-				$shortestString = $val;
-			}
-		}
-		$firstMatchIdx = array_search( $shortestString, $values );
-		unset( $values[ $firstMatchIdx ] );
-		array_unshift( $values, $shortestString );
-		return $values;
 	}
 }

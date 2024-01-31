@@ -53,7 +53,7 @@ class PFTemplateDisplay {
 				$unescapedFieldName = str_replace( '_', ' ', $fieldName );
 				$curFieldValue = $frame->getArgument( $unescapedFieldName );
 			}
-			$tableFieldValues[$fieldName] = $curFieldValue;
+			$tableFieldValues[$fieldName] = $parser->internalParse( $curFieldValue );
 		}
 
 		if ( $format == 'table' ) {
@@ -128,8 +128,6 @@ class PFTemplateDisplay {
 				$formattedFieldValue = self::ratingText( $fieldValue );
 			} elseif ( $fieldType == 'File' ) {
 				$formattedFieldValue = self::fileText( $fieldValue );
-			} elseif ( $fieldType == 'URL' ) {
-				$formattedFieldValue = self::urlText( $fieldValue );
 			} elseif ( $templateField->isList() ) {
 				$formattedFieldValue = self::stringListText( $fieldValue, $templateField );
 			} else {
@@ -242,6 +240,16 @@ class PFTemplateDisplay {
 		if ( $title == null || !$title->exists() ) {
 			return $value;
 		}
+
+		if ( $title->isRedirect() ) {
+			$wikiPage = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromTitle( $title );
+
+			$title = $wikiPage->getRedirectTarget();
+			if ( !$title->exists() ) {
+				return $title->getText();
+			}
+		}
+
 		$file = MediaWikiServices::getInstance()->getRepoGroup()->getLocalRepo()->newFile( $title );
 		return Linker::makeThumbLinkObj(
 			$title,
@@ -250,11 +258,6 @@ class PFTemplateDisplay {
 			'',
 			'left'
 		);
-	}
-
-	private static function urlText( $value ) {
-		global $wgExternalLinkTarget;
-		return Linker::makeExternalLink( $value, $value, true, '', [ 'target' => $wgExternalLinkTarget ] );
 	}
 
 }

@@ -45,7 +45,6 @@ class PFFormEditAction extends Action {
 	 * a form
 	 * @param IContextSource $obj
 	 * @param array &$links
-	 * @return true
 	 */
 	static function displayTab( $obj, &$links ) {
 		$title = $obj->getTitle();
@@ -59,12 +58,12 @@ class PFFormEditAction extends Action {
 		// special-page check is there.
 		if ( !isset( $title ) ||
 			( $title->getNamespace() == NS_SPECIAL ) ) {
-			return true;
+			return;
 		}
 
 		$form_names = PFFormLinker::getDefaultFormsForPage( $title );
 		if ( count( $form_names ) == 0 ) {
-			return true;
+			return;
 		}
 
 		global $wgPageFormsRenameEditTabs, $wgPageFormsRenameMainEditTab;
@@ -72,7 +71,7 @@ class PFFormEditAction extends Action {
 		$content_actions = &$links['views'];
 
 		$permissionManager = MediaWikiServices::getInstance()->getPermissionManager();
-		$user_can_edit = $permissionManager->userCan( 'edit', $user, $title );
+		$user_can_edit = $permissionManager->userCan( 'edit', $user, $title, $permissionManager::RIGOR_QUICK );
 
 		// Create the form edit tab, and apply whatever changes are
 		// specified by the edit-tab global variables.
@@ -139,13 +138,12 @@ class PFFormEditAction extends Action {
 			unset( $content_actions['edit'] );
 			unset( $content_actions['viewsource'] );
 		}
-
-		// always return true, in order not to stop MW's hook processing!
-		return true;
 	}
 
 	static function displayFormChooser( $output, $title ) {
-		$output->addModules( 'ext.pageforms.main' );
+		global $wgPageFormsMainFormsMinimum;
+
+		$output->addModules( 'ext.pageforms.main.styles' );
 
 		$targetName = $title->getPrefixedText();
 		$output->setPageTitle( wfMessage( "creating", $targetName )->text() );
@@ -164,10 +162,12 @@ class PFFormEditAction extends Action {
 			$totalPages += $numPages;
 		}
 		// We define "popular forms" as those that are used to
-		// edit more than 1% of the wiki's form-editable pages.
+		// edit more than the specified amount of the wiki's
+		// form-editable pages. (Set by $wgPageFormsMainFormsMinimum,
+		// which by default is 1%.)
 		$popularForms = [];
 		foreach ( $pagesPerForm as $formName => $numPages ) {
-			if ( $numPages > $totalPages / 100 ) {
+			if ( $numPages > $totalPages * $wgPageFormsMainFormsMinimum ) {
 				$popularForms[] = $formName;
 			}
 		}
@@ -223,7 +223,7 @@ class PFFormEditAction extends Action {
 	 * @return int[]
 	 */
 	static function getNumPagesPerForm() {
-		$dbr = wfGetDB( DB_REPLICA );
+		$dbr = PFUtils::getReadDB();
 		$res = $dbr->select(
 			[ 'category', 'page', 'page_props' ],
 			[ 'pp_value', 'SUM(cat_pages) AS total_pages' ],

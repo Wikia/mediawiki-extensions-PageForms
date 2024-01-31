@@ -476,12 +476,13 @@ END;
 			}
 		}
 
-		if ( $form_id !== null ) {
+		if ( $form_def !== null ) {
+			// Do nothing.
+		} elseif ( $form_id !== null ) {
 			$form_title = Title::newFromID( $form_id );
 			$form_def = PFUtils::getPageText( $form_title );
-		} elseif ( $form_def == null ) {
-			// No id, no text -> nothing to do
-
+		} else {
+			// No text, no ID -> no form definition.
 			return '';
 		}
 
@@ -664,13 +665,7 @@ END;
 	 */
 	public static function purgeCacheOnSave( RenderedRevision $renderedRevision ) {
 		$articleID = $renderedRevision->getRevision()->getPageId();
-		if ( method_exists( MediaWikiServices::class, 'getWikiPageFactory' ) ) {
-			// MW 1.36+
-			$wikiPage = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromID( $articleID );
-		} else {
-			// MW 1.35
-			$wikiPage = WikiPage::newFromID( $articleID );
-		}
+		$wikiPage = MediaWikiServices::getInstance()->getWikiPageFactory()->newFromID( $articleID );
 		if ( $wikiPage == null ) {
 			// @TODO - should this ever happen?
 			return true;

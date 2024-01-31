@@ -12,7 +12,7 @@
  */
 /*global wgPageFormsShowOnSelect, wgPageFormsFieldProperties, wgPageFormsCargoFields, wgPageFormsDependentFields, validateAll, alert, mwTinyMCEInit, pf, Sortable*/
 
-( function ( $, mw ) {
+( function( $, mw ) {
 
 /*
  * Functions to register/unregister methods for the initialization and
@@ -99,7 +99,7 @@ $.fn.PageForms_registerInputInit = function( initFunction, param, noexecute ) {
 		// ensure initFunction is only executed after doc structure is complete
 		$(function() {
 			if ( initFunction !== undefined ) {
-				initFunction ( $input.attr("id"), param );
+				initFunction( $input.attr("id"), param );
 			}
 		});
 	}
@@ -685,7 +685,7 @@ $.fn.validateURLField = function() {
 $.fn.validateEmailField = function() {
 	var fieldVal = this.find("input").val();
 	// code borrowed from http://javascript.internet.com/forms/email-validation---basic.html
-	var email_regexp = /^\s*\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,6})+\s*$/;
+	var email_regexp = /^\s*\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,63})+\s*$/;
 	if (fieldVal === '' || email_regexp.test(fieldVal)) {
 		return true;
 	} else {
@@ -699,7 +699,7 @@ $.fn.validateNumberField = function() {
 	// Handle "E notation"/scientific notation ("1.2e-3") in addition
 	// to regular numbers
 	if (fieldVal === '' ||
-	fieldVal.match(/^\s*[\-+]?((\d+[\.,]?\d*)|(\d*[\.,]?\d+))([eE]?[\-\+]?\d+)?\s*$/)) {
+	fieldVal.match(/^\s*[\-+]?((\d{1,3}(,\d{3})+[\.,]?\d*)|(\d*[\.,]?\d+))([eE]?[\-\+]?\d+)?\s*$/)) {
 		return true;
 	} else {
 		this.addErrorMessage( 'pf_bad_number_error' );
@@ -807,13 +807,12 @@ $.fn.checkForPipes = function() {
 				this.addErrorMessage( 'pf_pipe_error' );
 				return false;
 			}
-		} else {
-			if ( nextDoubleBracketsEnd < 0 ) {
-				// Something is malformed - might as well throw
-				// an error.
-				this.addErrorMessage( 'pf_pipe_error' );
-				return false;
-			}
+		}
+		if ( nextDoubleBracketsEnd < 0 ) {
+			// Something is malformed - might as well throw
+			// an error.
+			this.addErrorMessage( 'pf_pipe_error' );
+			return false;
 		}
 
 		nextDoubleBracketsEnd = fieldVal.indexOf( ']]', curIndex );
@@ -914,7 +913,10 @@ function validateStartEndDateTimeField( startInput, endInput ) {
 
 }
 
-window.validateAll = function () {
+window.validateAll = function() {
+
+	// Remove all old error messages.
+	$(".errorMessage").remove();
 
 	// Hook that fires on form submission, before the validation.
 	mw.hook('pf.formValidationBefore').fire();
@@ -922,9 +924,6 @@ window.validateAll = function () {
 	var args = {numErrors: 0};
 	mw.hook('pf.formValidation').fire( args );
 	var num_errors = args.numErrors;
-
-	// Remove all old error messages.
-	$(".errorMessage").remove();
 
 	// Make sure all inputs are ignored in the "starter" instance
 	// of any multiple-instance template.
@@ -1551,8 +1550,6 @@ $.fn.setAutocompleteForDependentField = function( partOfMultiple ) {
  * @param {Mixed} partOfMultiple
  */
 $.fn.initializeJSElements = function( partOfMultiple ) {
-	var fancyBoxSettings;
-
 	this.find(".pfShowIfSelected").each( function() {
 		// Avoid duplicate calls on any one element.
 		if ( !partOfMultiple && $(this).parents('.multipleTemplateWrapper').length > 0 ) {
@@ -1645,7 +1642,7 @@ $.fn.initializeJSElements = function( partOfMultiple ) {
 	});
 
 	// Set the end date input to the value selected in start date
-	this.find("span.startDateInput").not(".hiddenByPF").find("input").last().blur( () => {
+	this.find("span.startDateInput").not(".hiddenByPF").find("input").last().blur( function() {
 		var endInput = $(this).find("span.endDateInput").not(".hiddenByPF");
 		var endYearInput = endInput.find(".yearInput");
 		var endMonthInput = endInput.find(".monthInput");
@@ -1662,23 +1659,9 @@ $.fn.initializeJSElements = function( partOfMultiple ) {
 			endMonthInput.val(startMonthVal);
 			endDayInput.val(startDayVal);
 		}
-	});
-
-	fancyBoxSettings = {
-		toolbar : false,
-		smallBtn : true,
-		iframe : {
-			preload : false,
-			css : {
-				width : '75%',
-				height : '75%'
-			}
-		},
-		animationEffect : false
-	};
+	}.bind(this));
 
 	if ( partOfMultiple ) {
-		this.find('.pfFancyBox').fancybox(fancyBoxSettings);
 		this.find('.autoGrow').autoGrow();
 		this.find(".pfRating").each( function() {
 			$(this).applyRatingInput();
@@ -1688,6 +1671,9 @@ $.fn.initializeJSElements = function( partOfMultiple ) {
 		});
 		this.find('.pfDatePicker').applyDatePicker();
 		this.find('.pfDateTimePicker').applyDateTimePicker();
+		this.find('a.popupformlink').click(function(evt){
+			return ext.popupform.handlePopupFormLink( this.getAttribute('href'), this );
+		});
 		// Only defined if $wgPageFormsSimpleUpload == true.
 		if ( typeof this.initializeSimpleUpload === 'function' ) {
 			this.find(".simpleUploadInterface").each( function() {
@@ -1699,7 +1685,6 @@ $.fn.initializeJSElements = function( partOfMultiple ) {
 		// Forms classes that require special JS handling.
 		this.find('.mw-collapsible').makeCollapsible();
 	} else {
-		this.find('.pfFancyBox').not('multipleTemplateWrapper .pfFancyBox').fancybox(fancyBoxSettings);
 		this.find('.autoGrow').not('.multipleTemplateWrapper .autoGrow').autoGrow();
 		this.find(".pfRating").not(".multipleTemplateWrapper .pfRating").each( function() {
 			$(this).applyRatingInput();
@@ -1842,6 +1827,17 @@ $(document).ready( function() {
 		return;
 	}
 
+	function minimizeInstances( minHeight ) {
+		if ( minHeight >= 0) {
+			$('.multipleTemplateList').each( function() {
+				if ( $(this).height() > minHeight ) {
+					$(this).addClass('minimizeAll');
+					$(this).possiblyMinimizeAllOpenInstances();
+				}
+			});
+		}
+	}
+
 	// jQuery's .ready() function is being called before the resource was actually loaded.
 	// This is a workaround for https://phabricator.wikimedia.org/T216805.
 	setTimeout( function(){
@@ -1877,23 +1873,25 @@ $(document).ready( function() {
 			$(this).addInstance( false );
 		});
 		var wgPageFormsHeightForMinimizingInstances = mw.config.get( 'wgPageFormsHeightForMinimizingInstances' );
-		if ( wgPageFormsHeightForMinimizingInstances >= 0) {
-			$('.multipleTemplateList').each( function() {
-				if ( $(this).height() > wgPageFormsHeightForMinimizingInstances ) {
-					$(this).addClass('minimizeAll');
-					$(this).possiblyMinimizeAllOpenInstances();
-				}
-			});
-		}
+		minimizeInstances( wgPageFormsHeightForMinimizingInstances );
+
 		$('.multipleTemplateList').each( function() {
 			var $list = $(this);
 			var sortable = Sortable.create($list[0], {
 				handle: '.instanceRearranger',
-				onStart: function (/**Event*/evt) {
+				onStart: function(/**Event*/evt) {
 					$list.possiblyMinimizeAllOpenInstances();
 				}
 			});
 		});
+
+		// If the Header Tabs extension is being used in this form, minimize all the
+		// relevant instances any time the tab is changed.
+		if ( $( "#headertabs" ).length ) {
+			$( ".oo-ui-tabOptionWidget" ).on( 'click', function( event ) {
+				minimizeInstances( wgPageFormsHeightForMinimizingInstances );
+			});
+		}
 
 		// If there are any "wizard screen" elements defined in the
 		// form, turn the whole form into a wizard, with successive
