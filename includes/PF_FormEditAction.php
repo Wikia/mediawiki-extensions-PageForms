@@ -101,7 +101,7 @@ class PFFormEditAction extends Action {
 		$form_edit_tab = [
 			'class' => $class_name,
 			'text' => wfMessage( $form_edit_tab_msg )->text(),
-			'href' => $title->getLocalURL( 'action=formedit' )
+			'href' => $title->getLocalURL( 'action=formedit' ),
 		];
 
 		// Find the location of the 'edit' tab, and add 'edit
@@ -231,17 +231,17 @@ class PFFormEditAction extends Action {
 				// Keep backward compatibility with
 				// the page property name for
 				// Semantic Forms.
-				'pp_propname' => [ 'PFDefaultForm', 'SFDefaultForm' ]
+				'pp_propname' => [ 'PFDefaultForm', 'SFDefaultForm' ],
 			],
 			__METHOD__,
 			[
 				'GROUP BY' => 'pp_value',
 				'ORDER BY' => 'total_pages DESC',
-				'LIMIT' => 100
+				'LIMIT' => 100,
 			],
 			[
 				'page' => [ 'JOIN', 'cat_title = page_title' ],
-				'page_props' => [ 'JOIN', 'page_id = pp_page' ]
+				'page_props' => [ 'JOIN', 'page_id = pp_page' ],
 			]
 		);
 
@@ -302,5 +302,9 @@ class PFFormEditAction extends Action {
 		$pfFormEdit->printForm( $form_name, $page_name );
 
 		return false;
+	}
+
+	public function doesWrites() {
+		return true;
 	}
 }

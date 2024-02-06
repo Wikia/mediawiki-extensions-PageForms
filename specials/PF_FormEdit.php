@@ -233,6 +233,10 @@ class PFFormEdit extends UnlistedSpecialPage {
 		$captcha->editShowCaptcha( $fakeEditPage );
 	}
 
+	public function doesWrites() {
+		return true;
+	}
+
 	protected function getGroupName() {
 		return 'pf_group';
 	}
