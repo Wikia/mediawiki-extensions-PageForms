@@ -14,7 +14,8 @@
 			"SiderealArt",
 			"Winston Sung",
 			"Wrightbus",
-			"아라"
+			"아라",
+			"SunAfterRain"
 		]
 	},
 	"pageforms-name": "頁面表單（Page Forms）",
@@ -123,7 +124,7 @@
 	"pf_forminputs_depth": "開始顯示的分類階層數",
 	"pf_forminputs_height": "此輸入欄位的高度 (像素)",
 	"pf_forminputs_width": "此輸入欄位的寬度 (像素)",
-	"pf_forminputs_checkboxes_select_all": "全部選擇",
+	"pf_forminputs_checkboxes_select_all": "全選",
 	"pf_forminputs_checkboxes_select_none": "全部取消",
 	"pf_forminputs_maxvalues": "欄位值允許填寫的數量限制",
 	"pf_forminputs_starwidth": "每顆星的寬度（與高度）",
@@ -134,7 +135,7 @@
 	"pf_createform_nameinput": "表單名稱",
 	"pf_createform_nameinputdesc": " (表單通常使用與其主要模板一樣的名稱) ：",
 	"pf_createform_template": "模板：",
-	"pf_createform_templatelabelinput": "模板標籤 (選填) ：",
+	"pf_createform_templatelabelinput": "模板標籤（非必填）：",
 	"pf_createform_allowmultiple": "在建立頁面時允許此模板使用多個 (或不用) 實例",
 	"pf_createform_field": "欄位：",
 	"pf_createform_fieldprop": "此欄位用來定義類型 $2 的屬性 $1。",
