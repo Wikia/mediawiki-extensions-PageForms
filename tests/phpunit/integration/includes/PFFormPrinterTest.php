@@ -119,6 +119,28 @@ class PFFormPrinterTest extends MediaWikiIntegrationTestCase {
 			'expected_page_text' => "====section 4====" ]
 		];
 
+		// #6 'hidden' parameter set
+		$provider[] = [
+			[
+				'form_definition' => "====section 4====
+								 {{{section|section 4|level=4|hidden}}}"
+			],
+			[
+				'expected_form_text' => "<input type=\"hidden\" name=\"_section[section 4]\">",
+				'expected_page_text' => "====section 4===="
+			]
+		];
+
+		$provider[] = [
+			[
+				'form_definition' => "{{{for template|TestTemplate123}}}{{{section|section 5|level=4|hidden}}}{{{end template}}}",
+			],
+			[
+				'expected_form_text' => "<input type=\"hidden\" name=\"_section[section 5]\">",
+				'expected_page_text' => "{{TestTemplate123}}\n====section 5====",
+			],
+		];
+
 		return $provider;
 	}
 
