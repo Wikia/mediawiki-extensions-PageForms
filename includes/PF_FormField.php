@@ -710,7 +710,7 @@ class PFFormField {
 				} else {
 					$str = $field_query_val;
 				}
-				return str_replace( [ '<', '>' ], [ '&lt;', '&gt;' ], $str );
+				return htmlspecialchars( $str, ENT_QUOTES );
 
 			}
 		}

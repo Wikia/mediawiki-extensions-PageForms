@@ -14,6 +14,7 @@
  */
 
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Permissions\PermissionManager;
 
 class PFFormPrinter {
 
@@ -708,7 +709,7 @@ END;
 		// parsed twice.
 		if ( array_key_exists( 'is_list', $value ) ) {
 			unset( $value['is_list'] );
-			return implode( "$delimiter ", $value );
+			return htmlentities( implode( "$delimiter ", $value ) );
 		}
 
 		// if it has 1 or 2 elements, assume it's a checkbox; if it has
@@ -920,7 +921,8 @@ END;
 
 			if ( method_exists( $permissionManager, 'getPermissionStatus' ) ) {
 				// MW 1.43+
-				$permissionStatus = $permissionManager->getPermissionStatus( 'edit', $user, $this->mPageTitle );
+				$rigor = $form_submitted ? PermissionManager::RIGOR_SECURE : PermissionManager::RIGOR_FULL;
+				$permissionStatus = $permissionManager->getPermissionStatus( 'edit', $user, $this->mPageTitle, $rigor );
 				if ( $readOnlyMode->isReadOnly() ) {
 					$permissionStatus->error( 'readonlytext', $readOnlyMode->getReason() );
 				}
@@ -1038,7 +1040,7 @@ END;
 				$brackets_end_loc = strpos( $section, "}}}", $brackets_loc );
 				// For cases with more than 3 ending brackets,
 				// take the last 3 ones as the tag end.
-				while ( $section[$brackets_end_loc + 3] == "}" ) {
+				while ( isset( $section[$brackets_end_loc + 3] ) && $section[$brackets_end_loc + 3] == "}" ) {
 					$brackets_end_loc++;
 				}
 				$bracketed_string = substr( $section, $brackets_loc + 3, $brackets_end_loc - ( $brackets_loc + 3 ) );
@@ -1081,6 +1083,10 @@ END;
 					if ( $is_new_template ) {
 						$template = PFTemplate::newFromName( $template_name );
 						$tif = PFTemplateInForm::newFromFormTag( $tag_components );
+					}
+					// if template does not have any fields make $tif a dummy variable
+					if ( $tif == null ) {
+						$tif = new PFTemplateInForm();
 					}
 					// Remove template tag.
 					$section = substr_replace( $section, '', $brackets_loc, $brackets_end_loc + 3 - $brackets_loc );
