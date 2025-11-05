@@ -17,6 +17,12 @@ class PFRunQuery extends IncludableSpecialPage {
 	}
 
 	function execute( $query ) {
+		// --- Fandom-start pingLimiter implementation ---
+		if ( $this->getUser()->pingLimiter( 'pf-runquery' ) ) {
+			throw new \ThrottledError();
+		}
+		// --- Fandom-end pingLimiter implementation ---
+
 		if ( !$this->including() ) {
 			$this->setHeaders();
 		}
@@ -98,12 +104,6 @@ class PFRunQuery extends IncludableSpecialPage {
 		$resultsText = '';
 
 		if ( $form_submitted ) {
-			// --- Fandom-start pingLimiter implementation ---
-			if ( $this->getUser()->pingLimiter( 'pf-runquery' ) ) {
-				throw new \ThrottledError();
-			}
-			// --- Fandom-end pingLimiter implementation ---
-
 			// @TODO - fix RunQuery's parsing so that this check
 			// isn't needed.
 			if ( PFUtils::getParser()->getOutput() == null ) {
