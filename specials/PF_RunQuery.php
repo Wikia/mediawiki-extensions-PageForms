@@ -79,6 +79,13 @@ class PFRunQuery extends IncludableSpecialPage {
 		// PF 4.3.1; in PF 4.3, there was no such option, and before
 		// 4.3, "wpRunQuery=true" was used).
 		$form_submitted = $req->getCheck( '_run' ) || $req->getVal( 'pfRunQueryFormName' ) == $form_name;
+
+		// Fandom start
+		if ( $form_submitted && $user->pingLimiter( 'run-query' ) ) {
+			throw new ThrottledError();
+		}
+		// Fandom end
+
 		$content = $req->getVal( 'wpTextbox1' );
 		$raw = $req->getBool( 'raw', false );
 
@@ -98,11 +105,6 @@ class PFRunQuery extends IncludableSpecialPage {
 		$resultsText = '';
 
 		if ( $form_submitted ) {
-			// Fandom start
-			if ( $user->pingLimiter( 'run-query' ) ) {
-				throw new ThrottledError();
-			}
-			// Fandom end
 
 			// @TODO - fix RunQuery's parsing so that this check
 			// isn't needed.
