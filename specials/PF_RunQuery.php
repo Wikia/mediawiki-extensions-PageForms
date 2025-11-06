@@ -98,6 +98,12 @@ class PFRunQuery extends IncludableSpecialPage {
 		$resultsText = '';
 
 		if ( $form_submitted ) {
+			// Fandom start
+			if ( $user->pingLimiter( 'run-query' ) ) {
+				throw new ThrottledError();
+			}
+			// Fandom end
+
 			// @TODO - fix RunQuery's parsing so that this check
 			// isn't needed.
 			if ( PFUtils::getParser()->getOutput() == null ) {
