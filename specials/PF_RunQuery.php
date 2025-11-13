@@ -41,6 +41,12 @@ class PFRunQuery extends IncludableSpecialPage {
 		$req = $this->getRequest();
 		$user = $this->getUser();
 
+		// Fandom-start
+		if ( $user->pingLimiter( 'runquery' ) ) {
+			throw new ThrottledError();
+		}
+		// Fandom-end
+
 		if ( PFUtils::ignoreFormName( $form_name ) ) {
 			$text = Html::rawElement( 'p', [ 'class' => 'error' ],
 				$this->msg( 'pf_autoedit_invalidform', PFUtils::linkText( PF_NS_FORM, $form_name ) )->parse() ) . "\n";
