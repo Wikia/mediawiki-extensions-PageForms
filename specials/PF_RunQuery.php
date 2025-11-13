@@ -7,10 +7,13 @@
  * @ingroup PF
  */
 
+use Fandom\Includes\Logging\Loggable;
+
 /**
  * @ingroup PFSpecialPages
  */
 class PFRunQuery extends IncludableSpecialPage {
+	use Loggable;
 
 	function __construct() {
 		parent::__construct( 'RunQuery' );
@@ -42,7 +45,10 @@ class PFRunQuery extends IncludableSpecialPage {
 		$user = $this->getUser();
 
 		// Fandom-start
-		if ( $user->pingLimiter( 'runquery' ) ) {
+		$limiter = $user->pingLimiter( 'runquery' );
+		if ( empty( $limiter) ) {
+			$this->error( 'runquery-fandom-pinglimiter-error' );
+		} else {
 			throw new ThrottledError();
 		}
 		// Fandom-end
