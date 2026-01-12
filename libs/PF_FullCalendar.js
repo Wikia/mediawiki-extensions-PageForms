@@ -48,9 +48,9 @@
 		// for the calendar interface
 		var formHtml = calendarHTML[templateName];
 		var popup = '<form id="popupForm">';
-		var deleteButton = '<button id="event_delete" class = "delete-event-button" name="data" type="button" >' + mw.msg('pf-calendar-deleteevent') + '</button>';
-		var createButton = '<button id="form_submit" class = "submit-event-button" name="data" type="button" >' + mw.msg('pf-calendar-createevent') + '</button>';
-		var updateButton = '<button id="form_submit" class = "submit-event-button" name="data" type="button" >' + mw.msg('pf-calendar-updateevent') + '</button>';
+        var deleteButton = '<button id="event_delete" class = "delete-event-button" name="data" type="button" >' + mw.message('pf-calendar-deleteevent').escaped() + '</button>';
+        var createButton = '<button id="form_submit" class = "submit-event-button" name="data" type="button" >' + mw.message('pf-calendar-createevent').escaped() + '</button>';
+        var updateButton = '<button id="form_submit" class = "submit-event-button" name="data" type="button" >' + mw.message('pf-calendar-updateevent').escaped() + '</button>';
 		popup += formHtml;
 		var createEventPopup = popup + createButton;
 		var updateEventPopup = popup + updateButton;

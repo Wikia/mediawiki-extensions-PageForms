@@ -398,7 +398,7 @@ class PFAutocompleteAPI extends ApiBase {
 				$fieldsStr = $cargoField = '_value';
 			}
 
-			$cdb = CargoUtils::getDB();
+			$cdb = CargoUtils::getDB( DB_REPLICA );
 			$quotedCargoField = $cdb->addIdentifierQuotes( $cargoField );
 
 			// LIKE is almost always case-insensitive for MySQL,
