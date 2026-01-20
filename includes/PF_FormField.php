@@ -705,9 +705,11 @@ class PFFormField {
 			}
 			if ( !$form_submitted && $field_query_val != '' ) {
 				if ( is_array( $field_query_val ) ) {
-					return PFFormPrinter::getStringFromPassedInArray( $field_query_val, $delimiter );
-				}
-				return $field_query_val;
+					$str = PFFormPrinter::getStringFromPassedInArray( $field_query_val, $delimiter );
+				} else {
+                    $str = $field_query_val;
+                }
+				return htmlspecialchars( $str, ENT_QUOTES );
 			}
 		}
 
