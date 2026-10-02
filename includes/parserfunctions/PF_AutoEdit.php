@@ -19,6 +19,7 @@
 
 use MediaWiki\Html\Html;
 use MediaWiki\MediaWikiServices;
+use MediaWiki\Skin\Skin;
 use MediaWiki\Title\Title;
 
 class PFAutoEdit {
