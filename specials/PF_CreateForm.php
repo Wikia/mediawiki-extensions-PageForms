@@ -101,8 +101,13 @@ class PFCreateForm extends SpecialPage {
 				}
 			}
 		}
-		if ( $req->getVal( 'add_field' ) != null && $req->getVal( 'new_template', '' ) !== '' ) {
-			$form_template = PFTemplateInForm::create( $req->getVal( 'new_template' ), "", false );
+		$new_template_input = $req->getVal( 'new_template', '' );
+		$new_template = $req->getVal( 'add_field' ) != null ?
+			PFUtils::normalizeTitleInput( $new_template_input, NS_TEMPLATE, $this, true ) : '';
+		$new_template_error = $new_template instanceof Message ? $new_template : null;
+		if ( is_string( $new_template ) && $new_template !== '' ) {
+			$new_template_input = '';
+			$form_template = PFTemplateInForm::create( $new_template, "", false );
 			$template_loc = $req->getVal( 'before_template' );
 			$template_count = 0;
 			if ( $template_loc === null ) {
@@ -301,7 +306,7 @@ class PFCreateForm extends SpecialPage {
 		] );
 
 		// Listing every template doesn't scale to large wikis.
-		$addTemplateDropdown = PFUtils::titleInputWidget( 'new_template', 'pfAddTemplateDropdown', NS_TEMPLATE, $out );
+		$addTemplateDropdown = PFUtils::titleInputWidget( 'new_template', 'pfAddTemplateDropdown', NS_TEMPLATE, $out, $new_template_input );
 
 		// If a template has already been added, show a dropdown letting
 		// the user choose where in the list to add a new dropdown.
@@ -366,6 +371,13 @@ class PFCreateForm extends SpecialPage {
 		// Disable 'save' and 'preview' buttons if user has not yet
 		// added any templates.
 		$text .= "\t" . $addTemplateHtml;
+		if ( $new_template_error ) {
+			$text .= new OOUI\MessageWidget( [
+				'type' => 'error',
+				'inline' => true,
+				'label' => new OOUI\HtmlSnippet( $new_template_error->parse() ),
+			] );
+		}
 
 		// The form HTML for page sections
 		// "Add Section" implemented with LabelWidget
