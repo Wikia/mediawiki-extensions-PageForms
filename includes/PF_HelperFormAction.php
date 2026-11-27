@@ -29,7 +29,13 @@ class PFHelperFormAction extends Action {
 	 * @return false
 	 */
 	public function show() {
+		$this->checkCanExecute( $this->getUser() );
 		return self::displayForm( $this->getArticle() );
+	}
+
+	/** @inheritDoc */
+	public function getRestriction() {
+		return 'edit';
 	}
 
 	/**
@@ -79,8 +85,11 @@ class PFHelperFormAction extends Action {
 		$content_actions = &$links['views'];
 
 		$permissionManager = MediaWikiServices::getInstance()->getPermissionManager();
-		$userCanEdit = $permissionManager->userCan( 'edit', $user, $title, $permissionManager::RIGOR_QUICK );
-		$form_create_tab_text = ( $userCanEdit ) ? 'pf_formcreate' : 'pf_viewform';
+		// The helper forms require the edit right, so a "View form" tab would only lead to an error.
+		if ( !$permissionManager->userCan( 'edit', $user, $title, $permissionManager::RIGOR_QUICK ) ) {
+			return;
+		}
+		$form_create_tab_text = 'pf_formcreate';
 
 		$class_name = ( $obj->getRequest()->getVal( 'action' ) == 'formcreate' ) ? 'selected' : '';
 		$form_create_tab = [

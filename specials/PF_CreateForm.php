@@ -17,7 +17,7 @@ use MediaWiki\Title\Title;
 class PFCreateForm extends SpecialPage {
 
 	function __construct() {
-		parent::__construct( 'CreateForm' );
+		parent::__construct( 'CreateForm', 'edit' );
 	}
 
 	function execute( $query ) {
@@ -26,6 +26,7 @@ class PFCreateForm extends SpecialPage {
 		$out->enableOOUI();
 
 		$this->setHeaders();
+		$this->checkPermissions();
 		if ( $req->getCheck( 'showinputtypeoptions' ) ) {
 			$out->disable();
 
@@ -43,7 +44,6 @@ class PFCreateForm extends SpecialPage {
 	function doSpecialCreateForm( $query ) {
 		$out = $this->getOutput();
 		$req = $this->getRequest();
-		$db = PFUtils::getReadDB();
 
 		if ( $query !== null ) {
 			$presetFormName = str_replace( '_', ' ', $query );
@@ -58,18 +58,7 @@ class PFCreateForm extends SpecialPage {
 
 		$out->addModules( [ 'ext.pageforms.collapsible', 'ext.pageforms.PF_CreateForm' ] );
 
-		// Get the names of all templates on this site.
-		$all_templates = [];
-		$res = $db->select(
-			'page',
-			'page_title',
-			[ 'page_namespace' => NS_TEMPLATE, 'page_is_redirect' => 0 ],
-			__METHOD__,
-			[ 'ORDER BY' => 'page_title' ]
-		);
-		while ( $row = $res->fetchRow() ) {
-			$all_templates[] = str_replace( '_', ' ', $row['page_title'] );
-		}
+		$hasTemplates = PFUtils::namespaceHasPages( NS_TEMPLATE );
 
 		$deleted_template_loc = null;
 		$deleted_section_loc = null;
@@ -112,8 +101,13 @@ class PFCreateForm extends SpecialPage {
 				}
 			}
 		}
-		if ( $req->getVal( 'add_field' ) != null ) {
-			$form_template = PFTemplateInForm::create( $req->getVal( 'new_template' ), "", false );
+		$new_template_input = $req->getVal( 'new_template', '' );
+		$new_template = $req->getVal( 'add_field' ) != null ?
+			PFUtils::normalizeTitleInput( $new_template_input, NS_TEMPLATE, $this, true ) : '';
+		$new_template_error = $new_template instanceof Message ? $new_template : null;
+		if ( is_string( $new_template ) && $new_template !== '' ) {
+			$new_template_input = '';
+			$form_template = PFTemplateInForm::create( $new_template, "", false );
 			$template_loc = $req->getVal( 'before_template' );
 			$template_count = 0;
 			if ( $template_loc === null ) {
@@ -304,11 +298,6 @@ class PFCreateForm extends SpecialPage {
 		$text .= $this->formCreationHTML( $form );
 
 		$text .= "<h2> " . $this->msg( 'pf_createform_addelements' )->escaped() . " </h2>";
-		$options = [];
-		foreach ( $all_templates as $template ) {
-			$new_option = [ 'data' => $template, 'label' => $template ];
-			array_push( $options, $new_option );
-		}
 		$items = [];
 
 		// "Add Template" implemented using Label Widget
@@ -316,11 +305,8 @@ class PFCreateForm extends SpecialPage {
 			'label' => $this->msg( 'pf_createform_addtemplate' )->escaped()
 		] );
 
-		$addTemplateDropdown = new OOUI\DropdownInputWidget( [
-			'options' => $options,
-			'id' => 'pfAddTemplateDropdown',
-			'name' => 'new_template',
-		] );
+		// Listing every template doesn't scale to large wikis.
+		$addTemplateDropdown = PFUtils::titleInputWidget( 'new_template', 'pfAddTemplateDropdown', NS_TEMPLATE, $out, $new_template_input );
 
 		// If a template has already been added, show a dropdown letting
 		// the user choose where in the list to add a new dropdown.
@@ -357,7 +343,7 @@ class PFCreateForm extends SpecialPage {
 			'flags' => [ 'progressive' ],
 		] );
 
-		if ( count( $all_templates ) == 0 ) {
+		if ( !$hasTemplates ) {
 			$addTemplateHtml = '';
 		} elseif ( count( $form_items ) > 0 ) {
 			$addTemplateHtml = new OOUI\HorizontalLayout( [
@@ -385,6 +371,13 @@ class PFCreateForm extends SpecialPage {
 		// Disable 'save' and 'preview' buttons if user has not yet
 		// added any templates.
 		$text .= "\t" . $addTemplateHtml;
+		if ( $new_template_error ) {
+			$text .= new OOUI\MessageWidget( [
+				'type' => 'error',
+				'inline' => true,
+				'label' => new OOUI\HtmlSnippet( $new_template_error->parse() ),
+			] );
+		}
 
 		// The form HTML for page sections
 		// "Add Section" implemented with LabelWidget

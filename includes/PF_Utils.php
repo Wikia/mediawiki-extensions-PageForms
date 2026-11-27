@@ -14,6 +14,7 @@ use MediaWiki\Linker\LinkTarget;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Title\Title;
+use MediaWiki\Widget\TitleInputWidget;
 use Wikimedia\Rdbms\DBConnRef;
 use Wikimedia\Rdbms\IReadableDatabase;
 
@@ -290,6 +291,75 @@ END;
 		foreach ( $otherModules as $rlModule ) {
 			$output->addModules( $rlModule );
 		}
+	}
+
+	/**
+	 * @param string $name
+	 * @param string $id
+	 * @param int $namespace
+	 * @param OutputPage $out
+	 * @param string $value
+	 * @return TitleInputWidget
+	 */
+	public static function titleInputWidget( $name, $id, $namespace, OutputPage $out, $value = '' ) {
+		$widget = new TitleInputWidget( [
+			'name' => $name,
+			'id' => $id,
+			'namespace' => $namespace,
+			'value' => $value,
+			'relative' => true,
+			'infusable' => true,
+			// Picked up by the autoinfuse script in core's mediawiki.htmlform
+			// module, so no PF-specific JS is needed.
+			'classes' => [ 'mw-htmlform-autoinfuse' ],
+		] );
+		$widget->setAttributes( [ 'data-mw-modules' => 'mediawiki.widgets' ] );
+		$out->addModules( [ 'mediawiki.htmlform', 'mediawiki.widgets' ] );
+		return $widget;
+	}
+
+	/**
+	 * Normalises free text from titleInputWidget(): "Foo" and "Category:Foo" both
+	 * become "Foo" for NS_CATEGORY, while e.g. "Form:Foo" is rejected.
+	 * @param string $value
+	 * @param int $namespace
+	 * @param MessageLocalizer $localizer
+	 * @param bool $mustExist
+	 * @return string|Message Title text without namespace ('' if empty), or an error
+	 */
+	public static function normalizeTitleInput( $value, $namespace, MessageLocalizer $localizer, $mustExist = false ) {
+		$value = trim( $value );
+		if ( $value === '' ) {
+			return '';
+		}
+		$title = Title::newFromText( $value, $namespace );
+		if ( $title === null ) {
+			return $localizer->msg( 'pf_formstart_badtitle' )->plaintextParams( $value );
+		}
+		if ( $title->isExternal() ) {
+			return $localizer->msg( 'htmlform-title-interwiki', $title->getPrefixedText() );
+		}
+		if ( !$title->inNamespace( $namespace ) ) {
+			return $localizer->msg( 'htmlform-title-badnamespace', $title->getPrefixedText(), $namespace );
+		}
+		if ( $mustExist && !$title->exists() ) {
+			return $localizer->msg( 'htmlform-title-not-exists', $title->getPrefixedText() );
+		}
+		return $title->getText();
+	}
+
+	/**
+	 * @param int $namespace
+	 * @return bool
+	 */
+	public static function namespaceHasPages( $namespace ) {
+		return (bool)self::getReadDB()->newSelectQueryBuilder()
+			->select( '1' )
+			->from( 'page' )
+			->where( [ 'page_namespace' => $namespace, 'page_is_redirect' => 0 ] )
+			->limit( 1 )
+			->caller( __METHOD__ )
+			->fetchField();
 	}
 
 	/**

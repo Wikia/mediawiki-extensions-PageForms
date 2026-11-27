@@ -660,6 +660,15 @@
 				"mobile"
 			]
 		},
+		"ext.pageforms.PF_CreateCategory": {
+			"scripts": [
+				"libs/PF_CreateCategory.js"
+			],
+			"targets": [
+				"desktop",
+				"mobile"
+			]
+		},
 		"ext.pageforms.PF_CreateForm": {
 			"scripts": [
 				"libs/PF_CreateForm.js"
