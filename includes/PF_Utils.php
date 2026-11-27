@@ -14,6 +14,7 @@ use MediaWiki\Linker\LinkTarget;
 use MediaWiki\MediaWikiServices;
 use MediaWiki\Revision\RevisionRecord;
 use MediaWiki\Title\Title;
+use MediaWiki\Widget\TitleInputWidget;
 use Wikimedia\Rdbms\DBConnRef;
 use Wikimedia\Rdbms\IReadableDatabase;
 
@@ -290,6 +291,43 @@ END;
 		foreach ( $otherModules as $rlModule ) {
 			$output->addModules( $rlModule );
 		}
+	}
+
+	/**
+	 * @param string $name
+	 * @param string $id
+	 * @param int $namespace
+	 * @param OutputPage $out
+	 * @return TitleInputWidget
+	 */
+	public static function titleInputWidget( $name, $id, $namespace, OutputPage $out ) {
+		$widget = new TitleInputWidget( [
+			'name' => $name,
+			'id' => $id,
+			'namespace' => $namespace,
+			'relative' => true,
+			'infusable' => true,
+			// Picked up by the autoinfuse script in core's mediawiki.htmlform
+			// module, so no PF-specific JS is needed.
+			'classes' => [ 'mw-htmlform-autoinfuse' ],
+		] );
+		$widget->setAttributes( [ 'data-mw-modules' => 'mediawiki.widgets' ] );
+		$out->addModules( [ 'mediawiki.htmlform', 'mediawiki.widgets' ] );
+		return $widget;
+	}
+
+	/**
+	 * @param int $namespace
+	 * @return bool
+	 */
+	public static function namespaceHasPages( $namespace ) {
+		return (bool)self::getReadDB()->newSelectQueryBuilder()
+			->select( '1' )
+			->from( 'page' )
+			->where( [ 'page_namespace' => $namespace, 'page_is_redirect' => 0 ] )
+			->limit( 1 )
+			->caller( __METHOD__ )
+			->fetchField();
 	}
 
 	/**

@@ -17,7 +17,7 @@ use MediaWiki\Title\Title;
 class PFCreateCategory extends SpecialPage {
 
 	function __construct() {
-		parent::__construct( 'CreateCategory' );
+		parent::__construct( 'CreateCategory', 'edit' );
 	}
 
 	static function createCategoryText( $default_form, $category_name, $parent_category ) {
@@ -36,6 +36,7 @@ class PFCreateCategory extends SpecialPage {
 
 	function execute( $query ) {
 		$this->setHeaders();
+		$this->checkPermissions();
 
 		$out = $this->getOutput();
 		$req = $this->getRequest();
@@ -51,8 +52,8 @@ class PFCreateCategory extends SpecialPage {
 			$presetCategoryName = null;
 			$category_name = $req->getVal( 'category_name' );
 		}
-		$default_form = $req->getVal( 'default_form' );
-		$parent_category = $req->getVal( 'parent_category' );
+		$default_form = $req->getVal( 'default_form', '' );
+		$parent_category = $req->getVal( 'parent_category', '' );
 
 		$save_page = $req->getCheck( 'wpSave' );
 		$preview_page = $req->getCheck( 'wpPreview' );
@@ -91,19 +92,11 @@ class PFCreateCategory extends SpecialPage {
 				]
 			);
 		}
+		// Listing every form and category in dropdowns doesn't scale to
+		// large wikis, so use title autocompletion (bounded prefix search).
 		$secondRow = '';
-		try {
-			$all_forms = PFUtils::getAllForms();
-			$options = [];
-			array_push( $options, [ 'data' => null, 'label' => null ] );
-			foreach ( $all_forms as $form ) {
-				array_push( $options, [ 'data' => $form, 'label' => $form ] );
-			}
-			$formSelector = new OOUI\DropdownInputWidget( [
-				'options' => $options,
-				'id' => 'form_dropdown',
-				'name' => 'default_form',
-			] );
+		if ( PFUtils::namespaceHasPages( PF_NS_FORM ) ) {
+			$formSelector = PFUtils::titleInputWidget( 'default_form', 'form_dropdown', PF_NS_FORM, $out );
 			$secondRow .= new OOUI\FieldLayout(
 				$formSelector,
 				[
@@ -111,25 +104,9 @@ class PFCreateCategory extends SpecialPage {
 					'align' => 'top'
 				]
 			);
-		// @phan-suppress-next-line PhanUnusedVariableCaughtException
-		} catch ( MWException $e ) {
-			// If we're here, it's probably because no forms have
-			// been defined on this wiki. If that's the case, just
-			// leave out the form selector.
 		}
 		$text .= $firstRow . $secondRow . "\n";
-		$options = [];
-		array_push( $options, [ 'data' => null, 'label' => null ] );
-		$categories = PFValuesUtils::getAllCategories();
-		foreach ( $categories as $category ) {
-			$category = str_replace( '_', ' ', $category );
-			array_push( $options, [ 'data' => $category, 'label' => $category ] );
-		}
-		$selectBody = new OOUI\DropdownInputWidget( [
-			'options' => $options,
-			'id' => 'category_dropdown',
-			'name' => 'parent_category',
-		] );
+		$selectBody = PFUtils::titleInputWidget( 'parent_category', 'category_dropdown', NS_CATEGORY, $out );
 		$thirdRow = new OOUI\FieldLayout(
 				$selectBody,
 				[
